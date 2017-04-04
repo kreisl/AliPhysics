@@ -150,6 +150,7 @@ void AliReducedAnalysisFlow::Process() {
     }
     fhVzeroQx->Fill(fEvent->CentralityTPC(),qsum.X());
     fhVzeroQy->Fill(fEvent->CentralityTPC(),qsum.Y());
+    fHistosManager->FillHistClass("Flow", fValues);
   }
   
 }
