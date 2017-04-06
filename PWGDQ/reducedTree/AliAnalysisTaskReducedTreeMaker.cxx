@@ -715,17 +715,15 @@ void AliAnalysisTaskReducedTreeMaker::FillCaloClusters() {
   }  // end loop over clusters
 }
 
-
 //_________________________________________________________________________________
 void AliAnalysisTaskReducedTreeMaker::FillFMDInfo(Bool_t isAOD) {
-  AliAODEvent* aodEvent = AliForwardUtil::GetAODEvent(this);
-  if (!aodEvent) {cout<<"didn't get AOD"<<endl; return;}
   Float_t m;
   AliReducedEventInfo *eventInfo = dynamic_cast<AliReducedEventInfo*>(fReducedEvent);
   if(!eventInfo) return;
   TClonesArray &fmd = *(eventInfo->GetFMD());
 
   if (isAOD) {
+   AliAODEvent *aodEvent = static_cast<AliAODEvent*>(InputEvent());
    TObject *obj = aodEvent->FindListObject("Forward");  
    if (!obj) return;
    AliAODForwardMult *aodForward = static_cast<AliAODForwardMult*>(obj);
@@ -745,6 +743,8 @@ void AliAnalysisTaskReducedTreeMaker::FillFMDInfo(Bool_t isAOD) {
      }
    }
   } else {
+    AliAODEvent* aodEvent = AliForwardUtil::GetAODEvent(this);
+    if (!aodEvent) {cout<<"didn't get AOD"<<endl; return;}
     TH2D* histos[5];
     histos[0] = static_cast<TH2D*>(aodEvent->FindListObject("FMD1I_cache"));  
     histos[1] = static_cast<TH2D*>(aodEvent->FindListObject("FMD2I_cache"));  
