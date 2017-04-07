@@ -727,7 +727,7 @@ void AliAnalysisTaskReducedTreeMaker::FillFMDInfo(Bool_t isAOD) {
     TObject *obj = aodEvent->FindListObject("Forward");  
     if (!obj) return;
     AliAODForwardMult *aodForward = static_cast<AliAODForwardMult*>(obj);
-    const TH2D &d2Ndetadphi = aodForward->GetHistogram();
+    TH2D &d2Ndetadphi = aodForward->GetHistogram();
     cout << d2Ndetadphi.GetNbinsX() << endl;
     Int_t nFMD=-1;
     // Loop over Eta
