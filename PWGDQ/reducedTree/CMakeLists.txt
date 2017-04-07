@@ -36,6 +36,7 @@ include_directories(${ROOT_INCLUDE_DIRS}
 set(SRCS
       AliAnalysisTaskReducedEventProcessor.cxx
       AliAnalysisTaskReducedTreeMaker.cxx
+      AliAnalysisTaskCrossCheck.cxx
       AliHistogramManager.cxx
       AliMixingHandler.cxx
       AliReducedAnalysisFlow.cxx

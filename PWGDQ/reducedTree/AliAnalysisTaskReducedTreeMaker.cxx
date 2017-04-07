@@ -723,25 +723,25 @@ void AliAnalysisTaskReducedTreeMaker::FillFMDInfo(Bool_t isAOD) {
   TClonesArray &fmd = *(eventInfo->GetFMD());
 
   if (isAOD) {
-   AliAODEvent *aodEvent = static_cast<AliAODEvent*>(InputEvent());
-   TObject *obj = aodEvent->FindListObject("Forward");  
-   if (!obj) return;
-   AliAODForwardMult *aodForward = static_cast<AliAODForwardMult*>(obj);
-   const TH2D &d2Ndetadphi = aodForward->GetHistogram();
-   Int_t nFMD=-1;
-   cout << d2Ndetadphi.GetSize() << " " << d2Ndetadphi.GetXaxis()->GetTitle() << " " << d2Ndetadphi.GetNbinsY() << endl;
-   // Loop over Eta
-   for (Int_t iEta = 1; iEta <= d2Ndetadphi.GetNbinsX(); iEta++) {
-     // Loop over phi 
-     for (Int_t iPhi = 1; iPhi <= d2Ndetadphi.GetNbinsY(); iPhi++) {
-       m = d2Ndetadphi.GetBinContent(iEta, iPhi);
-       //if(m<1E-6) continue;
-       nFMD++;
-       AliReducedFMDInfo *reducedFMD = (AliReducedFMDInfo*) fmd.ConstructedAt(nFMD);
-       reducedFMD->fMultiplicity = m;
-       reducedFMD->fId = -1 * iEta * d2Ndetadphi.GetNbinsY() + iPhi;
-     }
-   }
+    AliAODEvent *aodEvent = static_cast<AliAODEvent*>(InputEvent());
+    TObject *obj = aodEvent->FindListObject("Forward");  
+    if (!obj) return;
+    AliAODForwardMult *aodForward = static_cast<AliAODForwardMult*>(obj);
+    const TH2D &d2Ndetadphi = aodForward->GetHistogram();
+    cout << d2Ndetadphi.GetNbinsX() << endl;
+    Int_t nFMD=-1;
+    // Loop over Eta
+    for (Int_t iEta = 1; iEta <= d2Ndetadphi.GetNbinsX(); iEta++) {
+      // Loop over phi 
+      for (Int_t iPhi = 1; iPhi <= d2Ndetadphi.GetNbinsY(); iPhi++) {
+        m = d2Ndetadphi.GetBinContent(iEta, iPhi);
+        if(m<1E-6) continue;
+        nFMD++;
+        AliReducedFMDInfo *reducedFMD = (AliReducedFMDInfo*) fmd.ConstructedAt(nFMD);
+        reducedFMD->fMultiplicity = m;
+        reducedFMD->fId = -1 * iEta * d2Ndetadphi.GetNbinsY() + iPhi;
+      }
+    }
   } else {
     AliAODEvent* aodEvent = AliForwardUtil::GetAODEvent(this);
     if (!aodEvent) {cout<<"didn't get AOD"<<endl; return;}

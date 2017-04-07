@@ -8,6 +8,7 @@
 
 #pragma link C++ class AliAnalysisTaskReducedEventProcessor+;
 #pragma link C++ class AliAnalysisTaskReducedTreeMaker+;
+#pragma link C++ class AliAnalysisTaskCrossCheck+;
 #pragma link C++ class AliHistogramManager+;
 #pragma link C++ class AliMixingHandler+;
 #pragma link C++ class AliReducedAnalysisFlow+;
