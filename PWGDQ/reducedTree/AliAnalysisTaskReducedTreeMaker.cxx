@@ -24,6 +24,7 @@
 #include <TH1D.h>
 #include <TFile.h>
 #include <TBits.h>
+#include "TList.h"
 
 #include <AliAnalysisTaskSE.h>
 #include <AliCFContainer.h>
@@ -123,6 +124,7 @@ AliAnalysisTaskReducedTreeMaker::AliAnalysisTaskReducedTreeMaker() :
   //fBayesianResponse(0x0),
   fTreeFile(0x0),
   fTree(0x0),
+  fQAList(0x0),
   fReducedEvent(0x0),
   fUsedVars(0x0),
   fNevents(0)
@@ -179,6 +181,7 @@ AliAnalysisTaskReducedTreeMaker::AliAnalysisTaskReducedTreeMaker(const char *nam
   //fBayesianResponse(0x0),
   fTreeFile(0x0),
   fTree(0x0),
+  fQAList(0x0),
   fReducedEvent(0x0),
   fUsedVars(0x0),
   fNevents(0)
@@ -197,6 +200,7 @@ AliAnalysisTaskReducedTreeMaker::AliAnalysisTaskReducedTreeMaker(const char *nam
   DefineOutput(1, AliReducedBaseEvent::Class());   // reduced information tree
   if(writeTree)
    DefineOutput(2, TTree::Class());   // reduced information tree
+   DefineOutput(3, TList::Class());   // reduced information tree
 }
 
 
@@ -259,6 +263,10 @@ void AliAnalysisTaskReducedTreeMaker::UserCreateOutputObjects()
     fBayesianResponse = new AliFlowBayesianPID();
     fBayesianResponse->SetNewTrackParam();
   }*/
+  fFMDhist = new TH2D("fFMDhist","eta phi",200,-4,6,20,0,2*TMath::Pi());
+  fQAList = new TList();
+  fQAList->SetOwner(kTRUE);
+  fQAList->Add(fFMDhist);
   
   // enable all variables in the VarManager
   fUsedVars = new TBits(AliDielectronVarManager::kNMaxValues);
@@ -266,6 +274,7 @@ void AliAnalysisTaskReducedTreeMaker::UserCreateOutputObjects()
   PostData(1, fReducedEvent);
   if(fWriteTree)
     PostData(2, fTree);
+  PostData(3,fQAList);
   //if(fFillFriendInfo) PostData(3, fFriendTree);
   //PostData(2, fFriendTree);
   //PostData(1, fTree);
@@ -348,6 +357,7 @@ void AliAnalysisTaskReducedTreeMaker::UserExec(Option_t *option)
   //PostData(2, fFriendTree);
   if(fWriteTree)
     PostData(2, fTree);
+  PostData(3,fQAList);
 }
 
 
@@ -726,7 +736,7 @@ void AliAnalysisTaskReducedTreeMaker::FillFMDInfo(Bool_t isAOD) {
     if (!obj) return;
     AliAODForwardMult *aodForward = static_cast<AliAODForwardMult*>(obj);
     TH2D &d2Ndetadphi = aodForward->GetHistogram();
-    cout << d2Ndetadphi.GetNbinsX() << endl;
+    fFMDhist->Add(&d2Ndetadphi);
     Int_t nFMD=-1;
     // Loop over Eta
     for (Int_t iEta = 1; iEta <= d2Ndetadphi.GetNbinsX(); iEta++) {
@@ -737,7 +747,7 @@ void AliAnalysisTaskReducedTreeMaker::FillFMDInfo(Bool_t isAOD) {
         nFMD++;
         AliReducedFMDInfo *reducedFMD = (AliReducedFMDInfo*) fmd.ConstructedAt(nFMD);
         reducedFMD->fMultiplicity = m;
-        reducedFMD->fId = -1 * iEta * d2Ndetadphi.GetNbinsY() + iPhi;
+        reducedFMD->fId = iEta * d2Ndetadphi.GetNbinsY() + iPhi;
       }
     }
   } else {

@@ -155,6 +155,7 @@ public:
   //AliFlowBayesianPID* fBayesianResponse;
 
   TFile *fTreeFile;                  //! output file containing the tree
+  TList *fQAList;
   TTree *fTree;                      //! Reduced event tree
   
   Int_t fNevents;
