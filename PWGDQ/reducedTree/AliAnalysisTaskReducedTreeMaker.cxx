@@ -196,7 +196,7 @@ AliAnalysisTaskReducedTreeMaker::AliAnalysisTaskReducedTreeMaker(const char *nam
   //DefineInput(2,AliAODForwardMult::Class());
   DefineOutput(1, AliReducedBaseEvent::Class());   // reduced information tree
   if(writeTree)
-    DefineOutput(2, TTree::Class());   // reduced information tree
+   DefineOutput(2, TTree::Class());   // reduced information tree
 }
 
 
@@ -263,8 +263,6 @@ void AliAnalysisTaskReducedTreeMaker::UserCreateOutputObjects()
   // enable all variables in the VarManager
   fUsedVars = new TBits(AliDielectronVarManager::kNMaxValues);
   for(Int_t i=0;i<AliDielectronVarManager::kNMaxValues;++i) fUsedVars->SetBitNumber(i,kTRUE);
-  
-  
   PostData(1, fReducedEvent);
   if(fWriteTree)
     PostData(2, fTree);
