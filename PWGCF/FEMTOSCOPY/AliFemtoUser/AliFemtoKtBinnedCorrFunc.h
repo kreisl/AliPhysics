@@ -99,8 +99,8 @@ public:
   virtual AliFemtoCorrFctn* Clone() const { return new AliFemtoKtBinnedCorrFunc(*this); }
 
 private:
-  AliFemtoKtBinnedCorrFunc(const AliFemtoKtBinnedCorrFunc&);
-  AliFemtoKtBinnedCorrFunc& operator=(const AliFemtoKtBinnedCorrFunc&);
+//  AliFemtoKtBinnedCorrFunc(const AliFemtoKtBinnedCorrFunc&);
+//  AliFemtoKtBinnedCorrFunc& operator=(const AliFemtoKtBinnedCorrFunc&);
 protected:
   /// Name of the output TObjArray
   TString fName;

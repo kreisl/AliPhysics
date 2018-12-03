@@ -88,8 +88,8 @@ class AliFlowTrackSimpleCuts : public TNamed {
   Int_t    fPOItype; //which poi type do we produce? (RP=0, POI=1,2,3,4,5...)
 
   // not implemented: copy and assignment operator
-  AliFlowTrackSimpleCuts(const AliFlowTrackSimpleCuts&);        
-  AliFlowTrackSimpleCuts& operator=(const AliFlowTrackSimpleCuts&);
+//  AliFlowTrackSimpleCuts(const AliFlowTrackSimpleCuts&);        
+//  AliFlowTrackSimpleCuts& operator=(const AliFlowTrackSimpleCuts&);
   
   ClassDef(AliFlowTrackSimpleCuts,4)
 };

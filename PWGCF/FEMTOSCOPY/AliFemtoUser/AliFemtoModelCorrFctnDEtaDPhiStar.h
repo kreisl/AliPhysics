@@ -114,8 +114,8 @@ public:
   virtual EtaPhiStar GetDeltaEtaDeltaPhiStar(const AliFemtoTrack&, const AliFemtoTrack&);
 
 private:
-  AliFemtoModelCorrFctnDEtaDPhiStar(const AliFemtoModelCorrFctnDEtaDPhiStar&);
-  AliFemtoModelCorrFctnDEtaDPhiStar& operator=(const AliFemtoModelCorrFctnDEtaDPhiStar&);
+//  AliFemtoModelCorrFctnDEtaDPhiStar(const AliFemtoModelCorrFctnDEtaDPhiStar&);
+//  AliFemtoModelCorrFctnDEtaDPhiStar& operator=(const AliFemtoModelCorrFctnDEtaDPhiStar&);
 
 protected:
 

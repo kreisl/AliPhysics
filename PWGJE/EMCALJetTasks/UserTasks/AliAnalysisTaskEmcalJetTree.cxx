@@ -387,15 +387,6 @@ AliAnalysisTaskEmcalJetTreeBase* AliAnalysisTaskEmcalJetTreeBase::CreateInstance
 templateClassImp(AliAnalysisTaskEmcalJetTree)
 /// \endcond
 
-/// Default constructor for ROOT I/O purposes
-template <class T, class U>
-AliAnalysisTaskEmcalJetTree<T,U>::AliAnalysisTaskEmcalJetTree() :
-  AliAnalysisTaskEmcalJetTreeBase("AliAnalysisTaskEmcalJetTree"),
-  fCurrentOutput(0),
-  fCurrentEvent(0)
-{
-}
-
 /// Specialized default constructor (AliEmcalJetInfoSummaryPP) for ROOT I/O purposes
 /// This is needed to address a "feature" (aka bug) of ROOT CINT, to be checked (maybe fixed in newer versions of ROOT)
 template <>
@@ -446,12 +437,20 @@ AliAnalysisTaskEmcalJetTree<AliAnalysisTaskEmcalJetTreeBase::AliEmcalJetInfoSumm
 {
 }
 
-/// Standard named constructor
-///
-/// \param name Name of the task
-template <class T, class U>
-AliAnalysisTaskEmcalJetTree<T, U>::AliAnalysisTaskEmcalJetTree(const char *name) :
-  AliAnalysisTaskEmcalJetTreeBase(name),
+/// Specialized default constructor (AliEmcalJetInfoSummaryPbPb) for ROOT I/O purposes
+/// This is needed to address a "feature" (aka bug) of ROOT CINT, to be checked (maybe fixed in newer versions of ROOT)
+template <>
+AliAnalysisTaskEmcalJetTree<AliAnalysisTaskEmcalJetTreeBase::AliEmcalJetInfoSummaryPPCharged, AliAnalysisTaskEmcalJetTreeBase::AliEmcalJetEventInfoSummaryPPSimulation>::AliAnalysisTaskEmcalJetTree() :
+  AliAnalysisTaskEmcalJetTreeBase("AliAnalysisTaskEmcalJetTree"),
+  fCurrentOutput(0),
+  fCurrentEvent(0)
+{
+}
+/// Specialized default constructor (AliEmcalJetInfoSummaryPbPb) for ROOT I/O purposes
+/// This is needed to address a "feature" (aka bug) of ROOT CINT, to be checked (maybe fixed in newer versions of ROOT)
+template <>
+AliAnalysisTaskEmcalJetTree<AliAnalysisTaskEmcalJetTreeBase::AliEmcalJetInfoSummaryPP, AliAnalysisTaskEmcalJetTreeBase::AliEmcalJetEventInfoSummaryPPSimulation>::AliAnalysisTaskEmcalJetTree() :
+  AliAnalysisTaskEmcalJetTreeBase("AliAnalysisTaskEmcalJetTree"),
   fCurrentOutput(0),
   fCurrentEvent(0)
 {

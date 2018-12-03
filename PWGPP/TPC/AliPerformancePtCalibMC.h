@@ -37,7 +37,6 @@ class TRootIOCtor;
 
 class AliPerformancePtCalibMC : public AliPerformanceObject {
 public:
-  AliPerformancePtCalibMC(TRootIOCtor*);
   AliPerformancePtCalibMC(const char *name= "AliPerformancePtCalibMC", const char *title="AliPerformancePtCalibMC");
    virtual ~AliPerformancePtCalibMC() ;
 

@@ -26,7 +26,7 @@ class TRootIOCtor;
 
 class AliPerformanceDCA : public AliPerformanceObject {
 public :
-  AliPerformanceDCA(TRootIOCtor*);
+//  AliPerformanceDCA(TRootIOCtor*);
   AliPerformanceDCA(const Char_t* name="AliPerformanceDCA", const Char_t* title="AliPerformanceDCA",Int_t analysisMode=0, Bool_t hptGenerator=kFALSE);
 
   virtual ~AliPerformanceDCA();

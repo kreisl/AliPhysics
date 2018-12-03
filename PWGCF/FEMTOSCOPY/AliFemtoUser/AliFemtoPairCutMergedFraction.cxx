@@ -196,12 +196,12 @@ AliFemtoString AliFemtoPairCutMergedFraction::Report() {
 //__________________
 TList *AliFemtoPairCutMergedFraction::ListSettings() {
   // return a list of settings in a writable form
-  TList *tListSetttings =  AliFemtoPairCut::ListSettings();
+  TList *tListSettings = new TList();
   char buf[200];
   snprintf(buf, 200, "AliFemtoPairCutMergedFraction.radiusrange=(%f,%f)", fRadiusMin, fRadiusMax);
-  tListSetttings->AddLast(new TObjString(buf));
+  tListSettings->AddLast(new TObjString(buf));
 
-  return tListSetttings;
+  return tListSettings;
 }
 
 //__________________

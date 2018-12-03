@@ -48,8 +48,8 @@ public:
     kNTRDTASKS = kNTRDQATASKS + kNTRDCALIBTASKS
   };
 
-  AliTRDpwgppHelper();
-  ~AliTRDpwgppHelper();
+//  AliTRDpwgppHelper();
+//  ~AliTRDpwgppHelper();
   
   static Bool_t AddTrainPerformanceTRD(const Char_t *trd="ALL", const Char_t *addMacroPath = "$ALICE_PHYSICS/PWGPP/TRD/macros");
   static Bool_t DoTask(Int_t idx, Int_t map);

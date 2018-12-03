@@ -134,7 +134,7 @@ public:
   void      MakeAODJet(AliCaloTrackParticleCorrelation * particle) ;
   void      MakeJetFromAOD(AliCaloTrackParticleCorrelation * particle) ;
   
-  Bool_t    SelectCluster(AliVCluster * calo, Double_t *vertex, TLorentzVector & mom, Int_t & pdg) ;
+  Bool_t    SelectCluster(AliVCluster * calo, Double_t *vertex, TLorentzVector & mom, Int_t & pdg) {} // was never implemented....
   
  private:
   

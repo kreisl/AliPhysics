@@ -42,7 +42,7 @@ public:
     Double_t  fFW[FW_MAX_ORDER];     // Fox-Wolfram moments
     Double_t  fPxyLead[2];           // px & py of the leading particle
   private:
-    AliMESevShape &operator=(const AliMESevShape &evs);
+//    AliMESevShape &operator=(const AliMESevShape &evs);
     ClassDef(AliMESevShape, 1)       // Event shape descriptor for MES
   };
 //   enum EMESevStat{

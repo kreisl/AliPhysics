@@ -343,10 +343,17 @@ private:
 template <class T, class U>
 class AliAnalysisTaskEmcalJetTree : public AliAnalysisTaskEmcalJetTreeBase {
  public:
-
-  AliAnalysisTaskEmcalJetTree();
-  AliAnalysisTaskEmcalJetTree(const char *name);
-
+  /// Standard constructor
+  AliAnalysisTaskEmcalJetTree() :
+    AliAnalysisTaskEmcalJetTreeBase("AliAnalysisTaskEmcalJetTree"),
+    fCurrentOutput(0), 
+    fCurrentEvent(0) { }
+  /// Standard named constructor
+  /// \param name Name of the task
+  AliAnalysisTaskEmcalJetTree(const char *name) :
+    AliAnalysisTaskEmcalJetTreeBase(name),
+    fCurrentOutput(0),
+    fCurrentEvent(0) { }
   virtual ~AliAnalysisTaskEmcalJetTree() {;}
 
   void                        UserCreateOutputObjects();

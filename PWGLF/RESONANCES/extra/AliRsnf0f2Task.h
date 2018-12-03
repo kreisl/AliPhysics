@@ -22,7 +22,7 @@ class AliRsnf0f2RunTable {
         enum {kPP,kPA,kAA,kUnknownCollType};
         AliRsnf0f2RunTable();
         AliRsnf0f2RunTable(Int_t runnumber);
-        ~AliRsnf0f2RunTable();
+        //~AliRsnf0f2RunTable();
 
         Bool_t IsPP(){
             return fCollisionType==kPP; 

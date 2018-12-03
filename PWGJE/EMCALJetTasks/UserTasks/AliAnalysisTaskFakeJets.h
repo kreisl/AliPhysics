@@ -89,7 +89,7 @@ class AliAnalysisTaskFakeJets : public AliAnalysisTaskEmcalJet {
   Float_t                            GetJetCircularity(AliEmcalJet *jet, Int_t jetContNb);
   Float_t                            LeSub(AliEmcalJet *jet, Int_t jetContNb);
   Float_t                            GetJetLeSub(AliEmcalJet *jet, Int_t jetContNb);
-  Float_t                            GetJetNumberOfConstituents(AliEmcalJet *jet,Int_t jetContNb);
+  Float_t                            GetJetNumberOfConstituents(AliEmcalJet *jet,Int_t jetContNb) {} // This is never implemented!!!
   Float_t                            GetJetHardTrack(AliEmcalJet *jet, Int_t jetContNb);
   Float_t                            HardTrack(AliEmcalJet *jet, Int_t jetContNb);
  Float_t                            GetJetSecHardTrack(AliEmcalJet *jet, Int_t jetContNb);
