@@ -244,6 +244,9 @@ else()
   # ZEROMQ
   find_package(ZeroMQ)
 
+  # Qn
+  find_package(Qn)
+
   # General flags -> Should be moved into a configuration file
   set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
   # Avoid problems with -fPIE (set automatically by the previous line).
