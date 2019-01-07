@@ -17,22 +17,24 @@
 set(MODULE PWGCFflowQn)
 add_definitions(-D_MODULE_="${MODULE}")
 
+# Qn
+find_package(Qn)
 # Module include folder
 include_directories(${AliPhysics_SOURCE_DIR}/PWGCF/FLOW/Qn)
 # Additional includes - alphabetical order except ROOT
-include_directories(${ROOT_INCLUDE_DIRS} ${AliPhysics_SOURCE_DIR}/OADB)
+include_directories(${ROOT_INCLUDE_DIRS} ${AliPhysics_SOURCE_DIR}/OADB ${AliPhysics_SOURCE_DIR}/OADB/COMMON/MULTIPLICITY)
 
 if (Qn_FOUND)
     include_directories(SYSTEM ${Qn_INCLUDE_DIR})
     link_directories(${Qn_LIBS_DIR})
+    message(${Qn_INCLUDE_DIR})
     # Sources - alphabetical order
     set(SRCS
       AliAnalysisTaskQn.cxx
       )
     # Headers from sources
     string(REPLACE ".cxx" ".h" HDRS "${SRCS}")
-    list(APPEND HDRS CorrectionManager.h)
-endif(Qn_FOUND)
+    #list(APPEND HDRS CorrectionManager.h)
 
 # Generate the dictionary
 # It will create G_ARG1.cxx and G_ARG1.h / ARG1 = function first argument
@@ -44,7 +46,7 @@ add_library_tested(${MODULE} SHARED  ${SRCS} G__${MODULE}.cxx)
 
 # Generate the ROOT map
 # Dependecies
-set(LIBDEPS ANALYSISalice)
+set(LIBDEPS ANALYSISalice Qn::QnCorrections Qn::Base Qn::Correction)
 generate_rootmap("${MODULE}" "${LIBDEPS}" "${CMAKE_CURRENT_SOURCE_DIR}/${MODULE}LinkDef.h")
 
 # Linking the library
@@ -63,3 +65,5 @@ install(TARGETS ${MODULE}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib)
 install(FILES ${HDRS} DESTINATION include)
+
+endif(Qn_FOUND)
