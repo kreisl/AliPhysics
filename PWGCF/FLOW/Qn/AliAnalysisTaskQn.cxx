@@ -92,11 +92,22 @@ void AliAnalysisTaskQn::UserExec(Option_t *) {
   if (!fInputEvent) return;
   if(!(((AliInputEventHandler*)(AliAnalysisManager::GetAnalysisManager()->GetInputEventHandler()))->IsEventSelected() & (AliVEvent::kMB+AliVEvent::kINT7+AliVEvent::kCentral+AliVEvent::kSemiCentral))) return;
   fValues = fQnManager->GetVariableContainer();
-  auto vertex = ((AliAODVertex*)fInputEvent->GetPrimaryVertex());
-  if (vertex->GetZ() > 10 || vertex->GetZ() < -10) return;
-  fValues[kVtxX] = vertex->GetX(); 
-  fValues[kVtxY] = vertex->GetY(); 
-  fValues[kVtxZ] = vertex->GetZ(); 
+  const AliAODVertex* vtxtrk = fInputEvent->GetPrimaryVertex();
+  if (vtxtrk->GetZ() > 10 || vtxtrk->GetZ() < -10) return;
+  //new vertex selection as Alexandru Dobrin 8.5.19
+  const AliAODVertex* vtxspd = fInputEvent->GetPrimaryVertexSPD();
+  double covtrk[6], covspd[6];
+  vtxtrk->GetCovarianceMatrix(covtrk);
+  vtxspd->GetCovarianceMatrix(covspd);
+  double dz = vtxtrk->GetZ() - vtxspd->GetZ();
+  double errortotal = sqrt(covtrk[5]+covspd[5]);
+  double errortracks = sqrt(covtrk[5]);
+  double nsigtotal = dz/errortotal;
+  double nsigtracks = dz/errortracks;
+  if (TMath::Abs(dz) > 0.2 || TMath::Abs(nsigtotal) > 10 || TMath::Abs(nsigtracks) > 20) return; // bad vertexing
+  fValues[kVtxX] = vtxtrk->GetX(); 
+  fValues[kVtxY] = vtxtrk->GetY(); 
+  fValues[kVtxZ] = vtxtrk->GetZ(); 
   bool old_centrality = false;
   if (fInputEvent->GetRunNumber() < 200000) old_centrality = true; // true if runnumber <= run1
   if (!old_centrality) { // run 2
@@ -123,6 +134,7 @@ void AliAnalysisTaskQn::UserExec(Option_t *) {
       fValues[kCentCL1] = centrality->GetCentralityPercentile("CL1");
     }
   }
+  if (fValues[kCentV0M] < 0. || fValues[kCentV0M] > 90.) return;
   auto trigger = ((AliInputEventHandler*)(AliAnalysisManager::GetAnalysisManager()->GetInputEventHandler()))->IsEventSelected();
   if (trigger & (AliVEvent::kMB+AliVEvent::kINT7)) {
     fValues[kTrigger] = 0;
@@ -177,6 +189,7 @@ void AliAnalysisTaskQn::UserExec(Option_t *) {
   fValues[kZDCASumMult] = summult;
   }
   //V0
+  float vzeromult = 0.;
   auto vzero = fInputEvent->GetVZEROData();
   if (vzero) {
     // V0-C
@@ -186,13 +199,16 @@ void AliAnalysisTaskQn::UserExec(Option_t *) {
       fValues[kV0CChPhi+ich] = TMath::ATan2(Y[ich%8], X[ich%8]); 
       fValues[kV0CChMult+ich] = vzero->GetMultiplicityV0C(ich); 
       fValues[kV0CChRing+ich] = ich/8;
+      vzeromult += vzero->GetMultiplicityV0C(ich);
     }
     // V0-A
     for (int ich = 0; ich < 32; ++ich) {
       fValues[kV0AChPhi+ich] = TMath::ATan2(Y[ich%8], X[ich%8]); 
       fValues[kV0AChMult+ich] = vzero->GetMultiplicityV0A(ich); 
       fValues[kV0AChRing+ich] = ich/8;
+      vzeromult += vzero->GetMultiplicityV0A(ich);
     }
+    fValues[kV0Mult] = vzeromult;
   }
   fQnManager->ProcessEvent();
   fQnManager->FillChannelDetectors();
@@ -201,7 +217,6 @@ void AliAnalysisTaskQn::UserExec(Option_t *) {
   for (int i=0;i<ntracks;++i) {
     auto track = static_cast<AliAODTrack*>(fInputEvent->GetTrack(i));
     if (!track) continue;
-    //if (!(track->TestFilterBit(256) || track->TestFilterBit(512))) continue;
     if (!track->TestFilterBit(128)) continue;
     ++ntracksfilterbit;
     fValues[kPhi] = track->Phi();

@@ -31,6 +31,7 @@ class AliAnalysisTaskQn : public AliAnalysisTaskSE
    kNITSClusters,
    kNTPCTracks = kNITSClusters + 6,
    kNTPCClusters,
+   kV0Mult,
    kVtxX,
    kVtxY,
    kVtxZ,
