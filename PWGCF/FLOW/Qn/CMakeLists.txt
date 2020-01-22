@@ -31,10 +31,10 @@ if (Qn_FOUND)
     # Sources - alphabetical order
     set(SRCS
       AliAnalysisTaskQn.cxx
+      AliQnLimits.cxx
       )
     # Headers from sources
     string(REPLACE ".cxx" ".h" HDRS "${SRCS}")
-    #list(APPEND HDRS CorrectionManager.h)
 
 # Generate the dictionary
 # It will create G_ARG1.cxx and G_ARG1.h / ARG1 = function first argument
@@ -46,7 +46,7 @@ add_library_tested(${MODULE} SHARED  ${SRCS} G__${MODULE}.cxx)
 
 # Generate the ROOT map
 # Dependecies
-set(LIBDEPS ANALYSISalice Qn::QnCorrections Qn::Base Qn::Correction Qn::Correlation)
+set(LIBDEPS ANALYSISalice Qn::Base Qn::Correction)
 generate_rootmap("${MODULE}" "${LIBDEPS}" "${CMAKE_CURRENT_SOURCE_DIR}/${MODULE}LinkDef.h")
 
 # Linking the library

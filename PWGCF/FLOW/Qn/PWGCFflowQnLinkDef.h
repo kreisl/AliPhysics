@@ -5,4 +5,5 @@
 #pragma link off all functions;
 
 #pragma link C++ class AliAnalysisTaskQn+;
+#pragma link C++ class AliQnLimits+;
 #endif

@@ -5,6 +5,7 @@
 
 #include "AliAnalysisTaskSE.h"
 #include "CorrectionManager.h"
+#include "AliQnLimits.h"
 
 class AliLHCData;
 class AliAODEvent;
@@ -19,6 +20,10 @@ class AliAnalysisTaskQn : public AliAnalysisTaskSE
 	 kRunNumber,
 	 kEventNumber,
    kTrigger,
+   kTimeStamp,
+   kPeriodNumber,
+   kOrbitNumber,
+   kBunchCrossNumber,
    kCentV0A,
    kCentV0C,
    kCentV0M,
@@ -35,8 +40,9 @@ class AliAnalysisTaskQn : public AliAnalysisTaskSE
    kVtxX,
    kVtxY,
    kVtxZ,
+   kZNSumEnergy,
    kFMDAPhi,
-   kFMDAMult = kFMDAPhi +1200,
+   kFMDAMult = kFMDAPhi + 1200,
    kFMDCPhi = kFMDAMult + 1200,
    kFMDCMult = kFMDCPhi + 1200,
    kV0CChMult = kFMDCMult + 1200,
@@ -49,7 +55,13 @@ class AliAnalysisTaskQn : public AliAnalysisTaskSE
    kZDCCSumMult = kZDCCChMult + 5,
    kZDCCChPhi = kZDCCSumMult + 1,
    kZDCAChMult = kZDCCChPhi + 5,
-   kZDCASumMult = kZDCAChMult + 5,
+   kZPAChMult = kZDCAChMult + 5,
+   kZPCChMult = kZPAChMult + 5,
+   kZPAChOffset = kZPCChMult + 5,
+   kZPCChOffset = kZPAChOffset + 5,
+   kZPAChPhi = kZPCChOffset + 5,
+   kZPCChPhi = kZPAChPhi + 5,
+   kZDCASumMult = kZPCChPhi + 5,
    kZDCAChPhi = kZDCASumMult + 1,
    kT0ChMult = kZDCAChPhi + 5,
    kT0ChPhi = kT0ChMult + 24,
@@ -65,7 +77,8 @@ class AliAnalysisTaskQn : public AliAnalysisTaskSE
    kDCAxySigma,
    kDCAzSigma,
    kCharge,
-   kTPCncls,
+   kTPCnCls,
+   kTPCchi2pCls,
    kFilterBits,
    kNVars = kFilterBits + kNFilterBits
   };
@@ -79,7 +92,6 @@ class AliAnalysisTaskQn : public AliAnalysisTaskSE
   enum OutputSlot {
     QnCalibration = 1,
     QnQA,
-    DetectorQA,
     QnTree
   };
   AliAnalysisTaskQn();
@@ -87,19 +99,22 @@ class AliAnalysisTaskQn : public AliAnalysisTaskSE
   virtual ~AliAnalysisTaskQn();
   virtual void UserCreateOutputObjects();
   virtual void NotifyRun();
-  virtual void UserExec(Option_t*); 
-  virtual void Terminate(Option_t*); 
+  virtual void UserExec(Option_t*);
+  virtual void Terminate(Option_t*);
   virtual void FinishTaskOutput();
   void SetCalibrationFile(TString, CalibFile);
   void SetOCDBPath(std::string path) { fOCDBPath = path;}
+  void SetFilterBit(unsigned int filterbit) { fFilterBit = filterbit; }
   Qn::CorrectionManager* GetQnManager() {return fQnManager;}
-  /// \cond CLASSDEF
-  ClassDef(AliAnalysisTaskQn, 2);
-  /// \endcond
+  void RequireTimeCorrections() { fRequireTime = true; }
  private:
+  bool          fRequireTime;
+  AliQnLimits*  fQnLimits;           //!<!
+  Qn::Axis<double>* fTimeAxis;       //!<!
+  unsigned int  fFilterBit;          //!<! AOD track filter bit
   CalibFile     fCalibFileType;      //!<! type of calibration file input
   Qn::CorrectionManager* fQnManager; //!<! Qn correction manager
-  AliAODEvent*  fInputEvent;         //!<! AOD input event
+  AliAODEvent*  fEvent;              //!<! AOD input event
   TList*        fInDetectorList;     //!<! in detector list
   TTree*        fQnTree;             //!<! Qn output tree
   TFile*        fInCalib;            //!<! calibration input file
@@ -109,14 +124,9 @@ class AliAnalysisTaskQn : public AliAnalysisTaskSE
   AliLHCData*   fLHCData;            //!<! LHC data
 	unsigned long fEventNumber;        //!<! LHC number of event in one run
 
-  
-  enum class ZDC {
-    A,
-    C
-  };
-
-  std::array<double,2> GetZDCQ(AliAnalysisTaskQn::ZDC zdctype);
-
+  /// \cond CLASSDEF
+  ClassDef(AliAnalysisTaskQn, 2);
+  /// \endcond
 };
 
 #endif
