@@ -20,6 +20,7 @@ add_subdirectory(GF)
 add_subdirectory(CME/TwoPwrtRP)
 add_subdirectory(Forward)
 add_subdirectory(Qn)
+add_subdirectory(ZDC)
 
 # Install the macros
 install(DIRECTORY Forward/macros DESTINATION PWGCF/FLOW)
