@@ -14,7 +14,7 @@
 # **************************************************************************/
 
 #Module
-set(MODULE PWGCFflowQn)
+set(MODULE PWGCFflowZDC)
 add_definitions(-D_MODULE_="${MODULE}")
 
 # Module include folder
@@ -22,14 +22,30 @@ include_directories(${AliPhysics_SOURCE_DIR}/PWGCF/FLOW/ZDC)
 # Additional includes - alphabetical order except ROOT
 include_directories(${ROOT_INCLUDE_DIRS} 
                     ${AliPhysics_SOURCE_DIR}/OADB 
-                    ${AliPhysics_SOURCE_DIR}/OADB/COMMON/MULTIPLICITY)
+                    ${AliPhysics_SOURCE_DIR}/OADB/COMMON/MULTIPLICITY
+                    ${AliPhysics_SOURCE_DIR}/PWG/Tools/yaml-cpp/include
+                    ${AliPhysics_SOURCE_DIR}/PWG/Tools/yaml-cpp
+                    )
 
 # Sources - alphabetical order
 set(SRCS
   AliAnalysisTaskFlowZDC.cxx
+  AliQvector.cxx
+  AliQvectorCorrection.cxx
+  AliQvectorCorrectionKD.cxx
+  AliZDCgainEq.cxx
+  AliZDCflowCuts.cxx
+  AliZDCdirectedFlow.cxx
+  AliZDCellipticFlow.cxx
+  AliZDCcumulantFlow.cxx
+  AliAnalysisTaskFlowZ.cxx
   )
 # Headers from sources
 string(REPLACE ".cxx" ".h" HDRS "${SRCS}")
+set(HDRS
+  "${HDRS}"
+  AliZDCanalysis.h
+  )
 
 # Generate the dictionary
 # It will create G_ARG1.cxx and G_ARG1.h / ARG1 = function first argument
@@ -45,7 +61,7 @@ set(LIBDEPS ANALYSISalice)
 generate_rootmap("${MODULE}" "${LIBDEPS}" "${CMAKE_CURRENT_SOURCE_DIR}/${MODULE}LinkDef.h")
 
 # Linking the library
-target_link_libraries(${MODULE} ${LIBDEPS})
+target_link_libraries(${MODULE} ${LIBDEPS} yaml-cpp)
 
 # Public include folders that will be propagated to the dependecies
 target_include_directories(${MODULE} PUBLIC ${incdirs})
