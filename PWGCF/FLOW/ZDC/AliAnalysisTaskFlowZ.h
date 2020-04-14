@@ -16,8 +16,10 @@
 #include "AliZDCellipticFlow.h"
 #include "AliZDCcumulantFlow.h"
 #include "AliQvector.h"
+#include "AliQvectorMagnitude.h"
 #include "AliQvectorCorrection.h"
 #include "AliQvectorCorrectionKD.h"
+#include "AliQvectorCorrectionND.h"
 
 class AliAnalysisTaskFlowZ : public AliAnalysisTaskSE {
  public:
@@ -41,6 +43,48 @@ class AliAnalysisTaskFlowZ : public AliAnalysisTaskSE {
  private:
   void GetSamples() { for (auto &entry : fSamples) entry = fPoisson(fRandomGenerator); }
   void AnalyzeEvent(AliAODEvent* event);
+  void ResetTreeValues();
+
+  // QA tree variables
+  TTree   *fTree = nullptr;
+  Double_t fBcentV0M = -1.;
+  Double_t fBcentCL1 = -1.;
+  Double_t fBvtxX = -1.;
+  Double_t fBvtxY = -1.;
+  Double_t fBvtxZ = -1.;
+  Long64_t fRunNumber = 0;
+  // Q ZNA
+  Double_t fBxZNA = 0.;
+  Double_t fByZNA = 0.;
+  Double_t fBsZNA = 0.;
+  // Q ZNC
+  Double_t fBxZNC = 0.;
+  Double_t fByZNC = 0.;
+  Double_t fBsZNC = 0.;
+  // Q ZNA iter
+  Double_t fBxZNAiter = 0.;
+  Double_t fByZNAiter = 0.;
+  Double_t fBsZNAiter = 0.;
+  // Q ZNC iter
+  Double_t fBxZNCiter = 0.;
+  Double_t fByZNCiter = 0.;
+  Double_t fBsZNCiter = 0.;
+  // Q ZNA all
+  Double_t fBxZNAall = 0.;
+  Double_t fByZNAall = 0.;
+  Double_t fBsZNAall = 0.;
+  // Q ZNC all
+  Double_t fBxZNCall = 0.;
+  Double_t fByZNCall = 0.;
+  Double_t fBsZNCall = 0.;
+  // Q TPC
+  Double_t fBxTPC768 = 0.;
+  Double_t fByTPC768 = 0.;
+  Double_t fBsTPC768 = 0.;
+  // Q TPC
+  Double_t fBxTPC96 = 0.;
+  Double_t fByTPC96 = 0.;
+  Double_t fBsTPC96 = 0.;
 
   AliEventCuts fEventCuts; //< general event cuts
   TList *fCorrelationList; //< output list correlations
@@ -62,6 +106,9 @@ class AliAnalysisTaskFlowZ : public AliAnalysisTaskSE {
   std::mt19937 fRandomGenerator{std::random_device{}()}; /// Random number generator
   std::poisson_distribution<> fPoisson{1};               /// distribution of events per sample.
 
+  AliQvectorCorrectionND fCorrectZNAall; //< ND recentering all in one step
+  AliQvectorCorrectionND fCorrectZNCall; //< ND recentering all in one step
+
   AliQvectorCorrection1D fCorrectZNAEQcentStep1; //< recentering corrections gain equalized zdc
   AliQvectorCorrection1D fCorrectZNCEQcentStep1; //< recentering corrections gain equalized zdc
   AliQvectorCorrectionKD fCorrectZNAEQvXYZStep2; //< recentering corrections gain equalized zdc
@@ -77,6 +124,9 @@ class AliAnalysisTaskFlowZ : public AliAnalysisTaskSE {
   AliQvectorCorrectionKD fCorrectZNCvXYZStep2; //< recentering corrections zdc
   AliQvectorCorrection1D fCorrectZNAcentStep3; //< recentering corrections zdc
   AliQvectorCorrection1D fCorrectZNCcentStep3; //< recentering corrections zdc
+
+  AliQvectorMagnitude fQZNAmagnitude;
+  AliQvectorMagnitude fQZNCmagnitude;
 
   // QA histograms
   TH1D* fCentralityV0M = nullptr; //!<! centrality QA histogram

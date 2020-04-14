@@ -8,36 +8,47 @@
 #include "TMath.h"
 
 struct AliQvector {
+  double x;
+  double y;
+  double sum;
 
-    double x;
-    double y;
-    double sum;
+  enum class WidthRescale {
+    YES,
+    NO
+  };
 
-    enum class WidthRescale {
-      YES,
-      NO
-    };
+  inline void Update(double phi, double weight) {
+    x += std::cos(phi) * weight;      
+    y += std::sin(phi) * weight;
+    sum += weight;
+  }
 
-    inline void Update(double phi, double weight) {
-      x += std::cos(phi) * weight;      
-      y += std::sin(phi) * weight;
-      sum += weight;
+  inline void Normalize() {
+    if (sum > 0.) {
+      x /= sum; 
+      y /= sum;
     }
+  }
 
-    inline void Normalize() {
-      if (sum > 0.) {
-        x /= sum; 
-        y /= sum;
-      }
-    }
+  inline double Psi() const {
+    return TMath::Pi() + std::atan2(y,x);
+  }
 
-    inline double Psi() {
-      return TMath::Pi() + std::atan2(y,x);
-    }
+  inline double Magnitude() const {
+    return std::sqrt(x*x + y*y);
+  }
 
-    AliQvector Recenter(double x_mean, double y_mean,
-                        double x_width, double y_width,
-                        bool rescale) const;
+  inline double MagnitudeRaw() const {
+    return std::sqrt(x*x*sum*sum + y*y*sum*sum);
+  }
+
+  inline double q() const {
+    return MagnitudeRaw() / std::sqrt(sum);
+  }
+
+  AliQvector Recenter(double x_mean, double y_mean,
+                      double x_width, double y_width,
+                      bool rescale) const;
 };
 
 struct AliZDCQvectors {

@@ -46,17 +46,18 @@ class AliZDCcumulantFlow : public AliZDCanalysis {
     void Fill(double phi, double weight) {
       std::array<double, Harmonics+1> cos_arr;
       std::array<double, Harmonics+1> sin_arr;
-      for (auto h = 0u; h <= Harmonics; ++h) {
+      for (auto h = 1u; h <= Harmonics; ++h) {
         cos_arr[h] = std::cos(h*phi);
         sin_arr[h] = std::sin(h*phi);
       }
       for (auto p = 1u; p <= Powers; ++p) {
-        for (auto h = 0u; h <= Harmonics; ++h) {
-          ref(h,p)  += std::complex<double>(std::pow(weight, p)*cos_arr[h],
-                                            std::pow(weight, p)*sin_arr[h]);
-          if (h == 0) continue;
-          ref(-h,p) += std::complex<double>( std::pow(weight, p)*cos_arr[h],
-                                            -std::pow(weight, p)*sin_arr[h]);
+        auto prefactor = std::pow(weight, p);
+        ref(0,p)  += std::complex<double>(prefactor, 0);
+        for (auto h = 1u; h <= Harmonics; ++h) {
+          ref(h,p)  += std::complex<double>(prefactor*cos_arr[h],
+                                            prefactor*sin_arr[h]);
+          ref(-h,p) += std::complex<double>( prefactor*cos_arr[h],
+                                            -prefactor*sin_arr[h]);
         }
       }
     }
@@ -84,6 +85,14 @@ class AliZDCcumulantFlow : public AliZDCanalysis {
   void FillPerTrackCorrelations(AliAODTrack *track);
   bool IsApplied() const { return fIsApplied; }
   void CalculateCumulants();
+  void FillESE(double qzna, double qznc);
+
+  void SetBootStrapSamples(int n) {
+    fNsamples = n;
+    fSamples.resize(n);
+  }
+  void SetESE(bool zdc = true) { fESE = zdc;}
+
   virtual void ReadYAMLnode(YAML::Node& node) {
     auto analysis_settings = node["analysis_settings"];
     if (analysis_settings.IsDefined()) {
@@ -91,13 +100,11 @@ class AliZDCcumulantFlow : public AliZDCanalysis {
     }
     fCuts.ReadYAMLnode(node);
   }
-  void SetBootStrapSamples(int n) {
-    fNsamples = n;
-    fSamples.resize(n);
-  }
 
  private:
-  TProfile3D* ReadFromOADB(TFile *file, const std::string&oadb_name, Int_t run_number);
+  void ResetQvectors();
+  TH3D* ReadFromOADB(TFile *file, const std::string&oadb_name, Int_t run_number);
+  void ScaleNUA(TH3D* unscaled, TH3D* scaled);
 
   bool fUseEtaGap = false;
   bool fIsApplied = false;
@@ -119,15 +126,16 @@ class AliZDCcumulantFlow : public AliZDCanalysis {
   Qv<4,4> fRetaGapN;              //!<!
   std::vector<Qv<4,4>> fPetaGapP; //!<!
   std::vector<Qv<4,4>> fQetaGapP; //!<!
-  TAxis* fAxisPt = nullptr;              //!<! p_T axis
-  TProfile3D* fNUAweightsIn = nullptr;         //!<! nua weight eta phi vtx z
-  TH1D* fPtEfficiencyIn = nullptr;       //!<! pt efficiency
+  TAxis* fAxisPt = nullptr;                    //!<! p_T axis
+  TH1D* fPtEfficiencyIn = nullptr;             //!<! pt efficiency
   TH1D* fAreNUAapplied = nullptr;
+  TH3D* fNUAweightsIn = nullptr;
+  TH3D* fNUAweightsScaled = nullptr;
+  TH3D* fNUAweightsOut = nullptr;
   TH3D* fNUAweightsNtracksTemp = nullptr; //!<! nua weight eta phi vtx z
-  TH3D* fAfterNUA = nullptr; //!<! nua weight eta phi vtx z
-  TH3D* fBeforeNUA = nullptr; //!<! nua weight eta phi vtx z
+  TH3D* fAfterNUA = nullptr;              //!<! nua weight eta phi vtx z
+  TH3D* fBeforeNUA = nullptr;             //!<! nua weight eta phi vtx z
   TH1D* fFilterBit = nullptr;
-  TProfile3D* fNUAweightsOut = nullptr; //!<! nua weight eta phi vtx z
   TProfile *fC22 = nullptr;              //!<! C_2{2}
   TProfile *fC22EtaGap = nullptr;        //!<! C_2{2}_{#Delta#eta>1.0}
   TProfile *fC24 = nullptr;              //!<! C_2{4}
@@ -142,11 +150,21 @@ class AliZDCcumulantFlow : public AliZDCanalysis {
   std::vector<TProfile2D *> fCdif22EtaGapBS;   //!<! C_2{2}_{#Delta#eta>1.0} bootstrap samples
   std::vector<TProfile2D *> fCdif24BS;         //!<! C'_2{4} bootstrap samples
 
+  bool fESE;
+  double fQpercentileZNA;
+  double fQpercentileZNC;
+
+  TProfile2D *fC22ESE = nullptr;              //!<! C_2{2} q selection
+  TProfile2D *fC22EtaGapESE = nullptr;        //!<! C_2{2}_{#Delta#eta>1.0} q selection
+  TProfile2D *fC24ESE = nullptr;              //!<! C_2{4} q selection
+
   TProfile *fSinTerms = nullptr;         //!<! Sin terms sin(1) | sin(1+2) | sin(1-2-3)
   TProfile *fCosTerms = nullptr;         //!<! Cos terms cos(1) | cos(1+2) | cos(1-2-3)
   TH2D *fMultC24 = nullptr;          //!<! C_2{4} multiplicity QA
   TH2D *fC22Distribution = nullptr;      //!<! C_2{2} distribution
+  TH2D *fC22DistributionWhole = nullptr;      //!<! C_2{4} distribution
   TH2D *fC24Distribution = nullptr;      //!<! C_2{4} distribution
+  TH2D *fC24DistributionWhole = nullptr;      //!<! C_2{4} distribution
 
   void FillFilterBitQA(AliAODTrack* track) {
     if (track->TestFilterBit(1))   fFilterBit->Fill(0.);

@@ -32,7 +32,6 @@ class AliZDCdirectedFlow : public AliZDCanalysis {
   void FillPerEventCorrelations();
 
  private:
-  bool fRequireGainEq = false;
   std::array<Bool_t, fNcentBinsWide> fIsInCentralityClassWide;
   Double_t fPtBinsWide[fNptBinsWide+1] = {0.15, 0.35, 0.54, 0.94, 1.33, 1.73, 2.12, 2.51, 2.91, 3.7, 4.88};
   Double_t fEtaBins[fNetaBins+1] = {-0.8,-0.48,-0.16,0.16,0.48,0.8};

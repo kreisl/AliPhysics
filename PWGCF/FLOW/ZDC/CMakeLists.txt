@@ -25,6 +25,7 @@ include_directories(${ROOT_INCLUDE_DIRS}
                     ${AliPhysics_SOURCE_DIR}/OADB/COMMON/MULTIPLICITY
                     ${AliPhysics_SOURCE_DIR}/PWG/Tools/yaml-cpp/include
                     ${AliPhysics_SOURCE_DIR}/PWG/Tools/yaml-cpp
+                    ${YAML_CPP_SOURCE_DIR}/include
                     )
 
 # Sources - alphabetical order
@@ -33,12 +34,14 @@ set(SRCS
   AliQvector.cxx
   AliQvectorCorrection.cxx
   AliQvectorCorrectionKD.cxx
+  AliQvectorCorrectionND.cxx
   AliZDCgainEq.cxx
   AliZDCflowCuts.cxx
   AliZDCdirectedFlow.cxx
   AliZDCellipticFlow.cxx
   AliZDCcumulantFlow.cxx
   AliAnalysisTaskFlowZ.cxx
+  AliQvectorMagnitude.cxx
   )
 # Headers from sources
 string(REPLACE ".cxx" ".h" HDRS "${SRCS}")
@@ -57,7 +60,7 @@ add_library_tested(${MODULE} SHARED  ${SRCS} G__${MODULE}.cxx)
 
 # Generate the ROOT map
 # Dependecies
-set(LIBDEPS ANALYSISalice)
+set(LIBDEPS ANALYSISalice OADB)
 generate_rootmap("${MODULE}" "${LIBDEPS}" "${CMAKE_CURRENT_SOURCE_DIR}/${MODULE}LinkDef.h")
 
 # Linking the library

@@ -33,22 +33,21 @@ void AliZDCellipticFlow::FindCentralityBin(AliAODEvent *event, Double_t centrali
 }
 
 void AliZDCellipticFlow::FillPerEventCorrelations() {
-  if (fCuts.PassedEventCuts()) {
-    fXaXcCent->Fill(fCentrality, fQZA.x*fQZC.x);
-    fYaYcCent->Fill(fCentrality, fQZA.y*fQZC.y);
-    fXaYcCent->Fill(fCentrality, fQZA.x*fQZC.y);
-    fYaXcCent->Fill(fCentrality, fQZA.y*fQZC.x);
-    fXaXcDistCent->Fill(fCentrality,fQZA.x*fQZC.x);
-    fYaYcDistCent->Fill(fCentrality,fQZA.y*fQZC.y);
-    fXaYcDistCent->Fill(fCentrality,fQZA.x*fQZC.y);
-    fYaXcDistCent->Fill(fCentrality,fQZA.y*fQZC.x);
-    for (int isample = 0; isample < fNsamples; ++isample) {
-      for (int i = 0; i < fSamples[isample]; ++i) {
-          fXaXcCentBS[isample]->Fill(fCentrality, fQZA.x*fQZC.x);
-          fYaYcCentBS[isample]->Fill(fCentrality, fQZA.y*fQZC.y);
-          fXaYcCentBS[isample]->Fill(fCentrality, fQZA.x*fQZC.y);
-          fYaXcCentBS[isample]->Fill(fCentrality, fQZA.y*fQZC.x);
-      }
+  if (!fCuts.PassedEventCuts()) return;
+  fXaXcCent->Fill(fCentrality, fQZA.x*fQZC.x);
+  fYaYcCent->Fill(fCentrality, fQZA.y*fQZC.y);
+  fXaYcCent->Fill(fCentrality, fQZA.x*fQZC.y);
+  fYaXcCent->Fill(fCentrality, fQZA.y*fQZC.x);
+  fXaXcDistCent->Fill(fCentrality,fQZA.x*fQZC.x);
+  fYaYcDistCent->Fill(fCentrality,fQZA.y*fQZC.y);
+  fXaYcDistCent->Fill(fCentrality,fQZA.x*fQZC.y);
+  fYaXcDistCent->Fill(fCentrality,fQZA.y*fQZC.x);
+  for (int isample = 0; isample < fNsamples; ++isample) {
+    for (int i = 0; i < fSamples[isample]; ++i) {
+        fXaXcCentBS[isample]->Fill(fCentrality, fQZA.x*fQZC.x);
+        fYaYcCentBS[isample]->Fill(fCentrality, fQZA.y*fQZC.y);
+        fXaYcCentBS[isample]->Fill(fCentrality, fQZA.x*fQZC.y);
+        fYaXcCentBS[isample]->Fill(fCentrality, fQZA.y*fQZC.x);
     }
   }
 }
@@ -59,13 +58,14 @@ void AliZDCellipticFlow::FillPerTrackCorrelations(AliAODTrack *track) {
   const Double_t pt = track->Pt(); 
   double v2_xxx = std::cos(2.*phi)*fQZA.x*fQZC.x;
   double v2_xyy = std::cos(2.*phi)*fQZA.y*fQZC.y;
-  double v2_yyx = std::sin(2.*phi)*fQZA.y*fQZC.x;
   double v2_yxy = std::sin(2.*phi)*fQZA.x*fQZC.y;
+  double v2_yyx = std::sin(2.*phi)*fQZA.y*fQZC.x;
   double v2_yyy = std::sin(2.*phi)*fQZA.y*fQZC.y;
   double v2_yxx = std::sin(2.*phi)*fQZA.x*fQZC.x;
   double v2_xyx = std::cos(2.*phi)*fQZA.y*fQZC.x;
   double v2_xxy = std::cos(2.*phi)*fQZA.x*fQZC.y;
 
+  fPtCent->Fill(fCentrality, pt);
   fV2XXXpTcent->Fill(fCentrality, pt, v2_xxx);
   fV2XYYpTcent->Fill(fCentrality, pt, v2_xyy);
   fV2YXYpTcent->Fill(fCentrality, pt, v2_yxy);
@@ -85,28 +85,34 @@ void AliZDCellipticFlow::FillPerTrackCorrelations(AliAODTrack *track) {
   }
 
   fV2XXXpT[fCentralityBin]->Fill(pt, v2_xxx);
+  fV2YYYpT[fCentralityBin]->Fill(pt, v2_yyy);
+
   fV2XYYpT[fCentralityBin]->Fill(pt, v2_xyy);
   fV2YXYpT[fCentralityBin]->Fill(pt, v2_yxy);
   fV2YYXpT[fCentralityBin]->Fill(pt, v2_yyx);
-  fV2YYYpT[fCentralityBin]->Fill(pt, v2_yyy);
-  fV2YXXpT[fCentralityBin]->Fill(pt, v2_yxx);
-  fV2XXYpT[fCentralityBin]->Fill(pt, v2_xxy);
-  fV2XYXpT[fCentralityBin]->Fill(pt, v2_xyx);
-  fPt[fCentralityBin]->Fill(pt);
-  if (!fCuts.CheckTrackCutsPtCutOnly(track)) return;
-  fXtXaXcDistCent->Fill(fCentrality, v2_xxx);
-  fXtYaYcDistCent->Fill(fCentrality, v2_xyy);
-  fYtXaYcDistCent->Fill(fCentrality, v2_yxy);
-  fYtYaXcDistCent->Fill(fCentrality, v2_yyx);
 
-  fXtXaXcCent->Fill(fCentrality, v2_xxx);
-  fXtXaYcCent->Fill(fCentrality, v2_xxy);
-  fXtYaXcCent->Fill(fCentrality, v2_xyx);
-  fYtXaXcCent->Fill(fCentrality, v2_yxx);
-  fYtYaYcCent->Fill(fCentrality, v2_yyy);
-  fYtYaXcCent->Fill(fCentrality, v2_yyx);
-  fXtYaYcCent->Fill(fCentrality, v2_xyy);
-  fYtXaYcCent->Fill(fCentrality, v2_yxy);
+  fV2YXXpT[fCentralityBin]->Fill(pt, v2_yxx);
+  fV2XYXpT[fCentralityBin]->Fill(pt, v2_xyx);
+  fV2XXYpT[fCentralityBin]->Fill(pt, v2_xxy);
+
+  fPt[fCentralityBin]->Fill(pt);
+  if (fCuts.CheckTrackCutsPtCutOnly(track)) {
+    fXtXaXcDistCent->Fill(fCentrality, v2_xxx);
+    fXtYaYcDistCent->Fill(fCentrality, v2_xyy);
+    fYtXaYcDistCent->Fill(fCentrality, v2_yxy);
+    fYtYaXcDistCent->Fill(fCentrality, v2_yyx);
+
+    fXtXaXcCent->Fill(fCentrality, v2_xxx);
+    fYtYaYcCent->Fill(fCentrality, v2_yyy);
+
+    fXtXaYcCent->Fill(fCentrality, v2_xxy);
+    fXtYaXcCent->Fill(fCentrality, v2_xyx);
+    fYtXaXcCent->Fill(fCentrality, v2_yxx);
+
+    fYtYaXcCent->Fill(fCentrality, v2_yyx);
+    fYtXaYcCent->Fill(fCentrality, v2_yxy);
+    fXtYaYcCent->Fill(fCentrality, v2_xyy);
+  }
 }
 
 TList *AliZDCellipticFlow::CreateCorrelations() {
@@ -149,6 +155,7 @@ TList *AliZDCellipticFlow::CreateCorrelations() {
   fV2YXXpTcent = new TProfile2D("vnYXXptCent",";centrality V0M; #it{p}_{T} / GeV/#it{c};#LTy_{2}X_{1}^{ZNA}X_{1}^{ZNC}#GT",100,0.,100.,nptbins,ptbins);
   fV2XXYpTcent = new TProfile2D("vnXXYptCent",";centrality V0M; #it{p}_{T} / GeV/#it{c};#LTx_{2}X_{1}^{ZNA}Y_{1}^{ZNC}#GT",100,0.,100.,nptbins,ptbins);
   fV2XYXpTcent = new TProfile2D("vnXYXptCent",";centrality V0M; #it{p}_{T} / GeV/#it{c};#LTx_{2}Y_{1}^{ZNA}X_{1}^{ZNC}#GT",100,0.,100.,nptbins,ptbins);
+  fPtCent = new TH2D("PtCent",";centrality V0M; #it{p}_{T} / GeV/#it{c};N",100,0.,100.,nptbins,ptbins);
   correlation_list->Add(fV2XXXpTcent);
   correlation_list->Add(fV2XYYpTcent);
   correlation_list->Add(fV2YXYpTcent);
@@ -157,6 +164,7 @@ TList *AliZDCellipticFlow::CreateCorrelations() {
   correlation_list->Add(fV2YXXpTcent);
   correlation_list->Add(fV2XXYpTcent);
   correlation_list->Add(fV2XYXpTcent);
+  correlation_list->Add(fPtCent);
   fXaXcCent = new TProfile("XXCent",";centrality V0M;#LTX_{1}^{ZNA}X_{1}^{ZNC}#GT",100,0.,100.);
   fYaYcCent = new TProfile("YYCent",";centrality V0M;#LTY_{1}^{ZNA}Y_{1}^{ZNC}#GT",100,0.,100.);
   fXaYcCent = new TProfile("XYCent",";centrality V0M;#LTX_{1}^{ZNA}Y_{1}^{ZNC}#GT",100,0.,100.);
@@ -186,18 +194,20 @@ TList *AliZDCellipticFlow::CreateCorrelations() {
   fXtYaYcCent = new TProfile("XYYCent","; centrality V0M;#LTx_{2}Y_{1}^{ZNA}Y_{1}^{ZNC}#GT",100,0.,100.);
   fYtXaYcCent = new TProfile("YXYCent","; centrality V0M;#LTy_{2}X_{1}^{ZNA}Y_{1}^{ZNC}#GT",100,0.,100.);
   fYtYaXcCent = new TProfile("YYXCent","; centrality V0M;#LTy_{2}Y_{1}^{ZNA}X_{1}^{ZNC}#GT",100,0.,100.);
-  fYtXaXcCent = new TProfile("XYYCent","; centrality V0M;#LTy_{2}Y_{1}^{ZNA}X_{1}^{ZNC}#GT",100,0.,100.);
+  fYtXaXcCent = new TProfile("YXXCent","; centrality V0M;#LTy_{2}X_{1}^{ZNA}X_{1}^{ZNC}#GT",100,0.,100.);
   fYtYaYcCent = new TProfile("YYYCent","; centrality V0M;#LTy_{2}Y_{1}^{ZNA}Y_{1}^{ZNC}#GT",100,0.,100.);
   fXtXaYcCent = new TProfile("XXYCent","; centrality V0M;#LTx_{2}X_{1}^{ZNA}Y_{1}^{ZNC}#GT",100,0.,100.);
   fXtYaXcCent = new TProfile("XYXCent","; centrality V0M;#LTx_{2}Y_{1}^{ZNA}X_{1}^{ZNC}#GT",100,0.,100.);
   correlation_list->Add(fXtXaXcCent);
+  correlation_list->Add(fYtYaYcCent);
+
   correlation_list->Add(fXtYaYcCent);
   correlation_list->Add(fYtXaYcCent);
   correlation_list->Add(fYtYaXcCent);
-  correlation_list->Add(fYtXaXcCent);
-  correlation_list->Add(fYtYaYcCent);
+
   correlation_list->Add(fXtXaYcCent);
   correlation_list->Add(fXtYaXcCent);
+  correlation_list->Add(fYtXaXcCent);
 
   auto bs_list = new TList();
   bs_list->SetOwner(true);

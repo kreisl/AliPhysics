@@ -10,8 +10,7 @@
  * copies and that both the copyright notice and this permission notice   *
  * appear in the supporting documentation. The authors make no claims     *
  * about the suitability of this software for any purpose. It is          *
- * provided "as is" without express or implied warranty.                  *
- **************************************************************************/
+ * provided "as is" without express or implied warranty.                  * **************************************************************************/
 
 #include <iostream>
 #include <cmath>
@@ -43,6 +42,11 @@ void AliZDCcumulantFlow::FindCentralityBin(AliAODEvent *event, Double_t centrali
   fSamples = samples;
 }
 
+void AliZDCcumulantFlow::FillESE(double qzna, double qznc) {
+ fQpercentileZNA = qzna;
+ fQpercentileZNC = qznc;
+}
+
 void AliZDCcumulantFlow::FillPerTrackCorrelations(AliAODTrack *track) { 
   if (!(fCuts.PassedEventCuts() && fCuts.CheckTrackCutsNoPtCut(track))) return;
   bool is_reference = false;
@@ -52,12 +56,12 @@ void AliZDCcumulantFlow::FillPerTrackCorrelations(AliAODTrack *track) {
   bool is_POI_eta_gap = false;
   const Double_t phi = track->Phi();
   const Double_t eta = track->Eta();
-  const Double_t pt = track->Pt(); 
+  const Double_t pt  = track->Pt(); 
   double weight = 1.;
-  if (pt > fPtMax || pt < fPtMin) return;
-  is_reference = true;
+  if (fCuts.CheckTrackCutsPtCutOnly(track)) is_reference = true;
   if (fApplyNUA && fNUAweightsIn) {
-    auto w = fNUAweightsIn->GetBinContent(fNUAweightsIn->FindBin(phi, eta, fVertexZ));
+    auto bin = fNUAweightsScaled->FindBin(phi, eta, fVertexZ);
+    auto w = fNUAweightsScaled->GetBinContent(bin);
     if (w > 0.) weight *= 1. / w;
     else return;
   }
@@ -76,7 +80,7 @@ void AliZDCcumulantFlow::FillPerTrackCorrelations(AliAODTrack *track) {
     if (fUseEtaGap && eta > fEtaGap) is_POI_eta_gap = true;
   }
   if (fCuts.CheckTrackCutsPtCutOnly(track)) {
-    if (is_reference)                fRptCut.Fill(phi, weight);
+    if      (is_reference)           fRptCut.Fill(phi, weight);
     if      (is_reference_eta_gap_p) fRptCutetaGapP.Fill(phi, weight);
     else if (is_reference_eta_gap_n) fRptCutetaGapN.Fill(phi, weight);
   }
@@ -86,7 +90,7 @@ void AliZDCcumulantFlow::FillPerTrackCorrelations(AliAODTrack *track) {
   if (is_reference_eta_gap_n)                   fRetaGapN.Fill(phi, weight);
   if (is_POI_eta_gap)                           fPetaGapP[bin].Fill(phi, weight);
   if (is_reference_eta_gap_n && is_POI_eta_gap) fQetaGapP[bin].Fill(phi, weight);
-  fNUAweightsNtracksTemp->Fill(phi, eta, fVertexZ);
+  fNUAweightsOut->Fill(phi, eta, fVertexZ);
   if (fApplyNUA) fBeforeNUA->Fill(phi, eta, fVertexZ, 1.);
   if (fApplyNUA) fAfterNUA->Fill(phi, eta, fVertexZ, weight);
   FillFilterBitQA(track);
@@ -94,48 +98,70 @@ void AliZDCcumulantFlow::FillPerTrackCorrelations(AliAODTrack *track) {
 
 void AliZDCcumulantFlow::CalculateCumulants() {
   if (!fCuts.PassedEventCuts()) return;
-  auto n22 = TwoParticleRef(fRptCut, 2);
   auto n02 = TwoParticleRef(fRptCut, 0);
-  if (n02.real() > 0.) {
-    fC22->Fill(fCentrality, (n22 / n02).real(), n02.real());
-    fC22Distribution->Fill(fCentrality, (n22 / n02).real(), n02.real());
-  }
-  auto n22eta = TwoParticleEtaGapRef(fRptCutetaGapN, fRptCutetaGapP, 2);
+  auto n22 = TwoParticleRef(fRptCut, 2);
   auto n02eta = TwoParticleEtaGapRef(fRptCutetaGapN, fRptCutetaGapP, 0);
-  if (n02eta.real() > 0.) fC22EtaGap->Fill(fCentrality, (n22eta / n02eta).real(), n02eta.real());
-  auto n24 = FourParticleRef(fRptCut,2);
+  auto n22eta = TwoParticleEtaGapRef(fRptCutetaGapN, fRptCutetaGapP, 2);
   auto n04 = FourParticleRef(fRptCut,0);
+  auto n24 = FourParticleRef(fRptCut,2);
+  if (n02.real() > 0.) {
+    auto value = (n22 / n02).real();
+    fC22->Fill(fCentrality, value, n02.real());
+    fC22Distribution->Fill(fCentrality, value, n02.real());
+    fC22DistributionWhole->Fill(fCentrality, value, n02.real());
+    if (fESE) {
+      fC22ESE->Fill(fCentrality,fQpercentileZNA   , value, n02.real());
+      fC22ESE->Fill(fCentrality,fQpercentileZNC+1., value, n02.real());
+    }
+  }
+  if (n02eta.real() > 0.) {
+    fC22EtaGap->Fill(fCentrality, (n22eta / n02eta).real(), n02eta.real());
+    if (fESE) {
+      fC22EtaGapESE->Fill(fCentrality, fQpercentileZNA   , (n22eta / n02eta).real(), n02eta.real());
+      fC22EtaGapESE->Fill(fCentrality, fQpercentileZNC+1., (n22eta / n02eta).real(), n02eta.real());
+    }
+  }
   if (n04.real() > 0.) {
-    fC24->Fill(fCentrality, (n24 / n04).real(), n04.real());
-    fC24Distribution->Fill(fCentrality, (n24 / n04).real(), n04.real());
+    auto value = (n24 / n04).real();
+    fC24->Fill(fCentrality, value, n04.real());
+    fC24Distribution->Fill(fCentrality, value, n04.real());
+    fC24DistributionWhole->Fill(fCentrality, value, n04.real());
     fMultC24->Fill(fCentrality, fRptCut(0,1).real());
+    if (fESE) {
+      fC24ESE->Fill(fCentrality, fQpercentileZNA   , value, n04.real());
+      fC24ESE->Fill(fCentrality, fQpercentileZNC+1., value, n04.real());
+    }
   }
   for (int i = 0; i < fAxisPt->GetNbins(); ++i) {
     auto pt = fAxisPt->GetBinCenter(i+1);
-    auto nd22 = TwoParticleDif(fQ[i], fP[i], fR, 2);
-    auto nd02 = TwoParticleDif(fQ[i], fP[i], fR, 0);
-    if (nd02.real() > 0.) fCdif22->Fill(fCentrality, pt, (nd22 / nd02).real(), nd02.real());
-    auto nd22eta = TwoParticleDif(fQetaGapP[i], fPetaGapP[i], fRetaGapN, 2);
-    auto nd02eta = TwoParticleDif(fQetaGapP[i], fPetaGapP[i], fRetaGapN, 0);
-    if (nd02eta.real() > 0.) fCdif22EtaGap->Fill(fCentrality, pt, (nd22eta / nd02eta).real(), nd02eta.real());
-    auto nd24 = FourParticleDif(fQ[i], fP[i], fR, 2);
-    auto nd04 = FourParticleDif(fQ[i], fP[i], fR, 0);
-    if (nd04.real() > 0.) fCdif24->Fill(fCentrality, pt, (nd24 / nd04).real(), nd04.real());
+    auto d02 = TwoParticleDif(fQ[i], fP[i], fR, 0);
+    auto d22 = TwoParticleDif(fQ[i], fP[i], fR, 2);
+    auto d22eta = TwoParticleDif(fQetaGapP[i], fPetaGapP[i], fRetaGapN, 2);
+    auto d02eta = TwoParticleDif(fQetaGapP[i], fPetaGapP[i], fRetaGapN, 0);
+    auto d24 = FourParticleDif(fQ[i], fP[i], fR, 2);
+    auto d04 = FourParticleDif(fQ[i], fP[i], fR, 0);
+    if (d02.real() > 0.) fCdif22->Fill(fCentrality, pt, (d22 / d02).real(), d02.real());
+    if (d02eta.real() > 0.) fCdif22EtaGap->Fill(fCentrality, pt, (d22eta / d02eta).real(), d02eta.real());
+    if (d04.real() > 0.) fCdif24->Fill(fCentrality, pt, (d24 / d04).real(), d04.real());
     for (int isample = 0; isample < fNsamples; ++isample) {
       for (int i = 0; i < fSamples[isample]; ++i) {
-        if (nd02.real() > 0.)    fCdif22BS[isample]->Fill(fCentrality, pt, (nd22 / nd02).real(), nd02.real());
-        if (nd02eta.real() > 0.) fCdif22EtaGapBS[isample]->Fill(fCentrality, pt, (nd22eta / nd02eta).real(), nd02eta.real());
-        if (nd04.real() > 0.)    fCdif24BS[isample]->Fill(fCentrality, pt, (nd24 / nd04).real(), nd04.real());
+        if (d02.real() > 0.) fCdif22BS[isample]->Fill(fCentrality, pt, (d22 / d02).real(), d02.real());
+        if (d02eta.real() > 0.) fCdif22EtaGapBS[isample]->Fill(fCentrality, pt, (d22eta / d02eta).real(), d02eta.real());
+        if (d04.real() > 0.) fCdif24BS[isample]->Fill(fCentrality, pt, (d24 / d04).real(), d04.real());
       }
     }
   }
   for (int isample = 0; isample < fNsamples; ++isample) {
     for (int i = 0; i < fSamples[isample]; ++i) {
-      if (n02.real() > 0.)    fC22BS[isample]->Fill(fCentrality, (n22 / n02).real(), n02.real());
+      if (n02.real() > 0.) fC22BS[isample]->Fill(fCentrality, (n22 / n02).real(), n02.real());
       if (n02eta.real() > 0.) fC22EtaGapBS[isample]->Fill(fCentrality, (n22eta / n02eta).real(), n02eta.real());
-      if (n04.real() > 0.)    fC24BS[isample]->Fill(fCentrality, (n24 / n04).real(), n04.real());
+      if (n04.real() > 0.) fC24BS[isample]->Fill(fCentrality, (n24 / n04).real(), n04.real());
     }
   }
+  ResetQvectors();
+}
+
+void AliZDCcumulantFlow::ResetQvectors() {
   fR.Reset();
   fRptCut.Reset();
   fRetaGapN.Reset();
@@ -147,21 +173,6 @@ void AliZDCcumulantFlow::CalculateCumulants() {
     fPetaGapP[i].Reset();
     fQetaGapP[i].Reset();
   }
-  auto x_axis = fNUAweightsNtracksTemp->GetXaxis();
-  auto y_axis = fNUAweightsNtracksTemp->GetYaxis();
-  auto z_axis = fNUAweightsNtracksTemp->GetZaxis();
-  for (auto ix = 1; ix <= x_axis->GetNbins(); ++ix) {
-    auto x = x_axis->GetBinCenter(ix);
-    for (auto iy = 1; iy <= y_axis->GetNbins(); ++iy) {
-      auto y = y_axis->GetBinCenter(iy);
-      for (auto iz = 1; iz <= z_axis->GetNbins(); ++iz) {
-        auto z = z_axis->GetBinCenter(iz);
-        auto ntracks = fNUAweightsNtracksTemp->GetBinContent(ix, iy, iz);
-        if (ntracks > 0.) fNUAweightsOut->Fill(x, y, z, ntracks);
-      }
-    }
-  }
-  fNUAweightsNtracksTemp->Reset();
 }
 
 void AliZDCcumulantFlow::Configure(double eta_gap, std::vector<double> pt_bins, std::vector<double> vtxz_bins, int n_phi_bins, int n_eta_bins, double eta_min, double eta_max) {
@@ -182,15 +193,17 @@ void AliZDCcumulantFlow::Configure(double eta_gap, std::vector<double> pt_bins, 
   std::vector<double> eta_bins;
   auto eta_bin_width = (eta_max - eta_min) / n_eta_bins;
   for (int i = 0; i < n_phi_bins+1; ++i) eta_bins.push_back(eta_min+i*eta_bin_width);
-  fNUAweightsNtracksTemp = new TH3D((fName+"_NUA_n_tracks_temp").data(),";#phi;#eta;vertex Z / cm", n_phi_bins, phi_bins.data(), n_eta_bins, eta_bins.data(), nvtxz, vtxz_bins.data());
-  fNUAweightsOut = new TProfile3D((fName+"_NUA").data(),";#phi;#eta;vertex Z / cm", n_phi_bins, phi_bins.data(), n_eta_bins, eta_bins.data(), nvtxz, vtxz_bins.data());
+  fNUAweightsOut = new TH3D((fName+"_NUA").data(),";#phi;#eta;vertex Z / cm", n_phi_bins, phi_bins.data(), n_eta_bins, eta_bins.data(), nvtxz, vtxz_bins.data());
+  fNUAweightsScaled = new TH3D((fName+"_NUA_Scaled").data(),";#phi;#eta;vertex Z / cm", n_phi_bins, phi_bins.data(), n_eta_bins, eta_bins.data(), nvtxz, vtxz_bins.data());
   fBeforeNUA = new TH3D((fName+"_BeforeNUAqa").data(),";#phi;#eta;vertex Z / cm", n_phi_bins, phi_bins.data(), n_eta_bins, eta_bins.data(), nvtxz, vtxz_bins.data());
   fAfterNUA = new TH3D((fName+"_AfterNUAqa").data(),";#phi;#eta;vertex Z / cm", n_phi_bins, phi_bins.data(), n_eta_bins, eta_bins.data(), nvtxz, vtxz_bins.data());
   fAreNUAapplied = new TH1D((fName+"_NUA_flag").data(),";are NUA weights appplied?;",2,0.,2.);
   fFilterBit = new TH1D((fName+"FilterBit").data(), ";filter bit;n tracks;" , 11, 0, 11.);
   fMultC24 = new TH2D((fName+"MultC24").data(),";CentralityV0M;multiplicity",100,0.,100.,5000, 0., 5000.);
-  fC22Distribution = new TH2D((fName+"C22Distribution").data(),";CentralityV0M;C_{2}{2}",100,0.,100.,1000, -0.02, 0.08);
-  fC24Distribution = new TH2D((fName+"C24Distribution").data(),";CentralityV0M;C_{2}{4}",100,0.,100.,1000,-0.0004,0.00030);
+  fC22Distribution = new TH2D((fName+"C22DistributionZoom").data(),";CentralityV0M;C_{2}{2}",100,0.,100.,1000, -0.02, 0.08);
+  fC24Distribution = new TH2D((fName+"C24DistributionZoom").data(),";CentralityV0M;C_{2}{4}",100,0.,100.,1000,-0.0004,0.00030);
+  fC22DistributionWhole = new TH2D((fName+"C22DistributionWhole").data(),";CentralityV0M;C_{2}{2}",100,0.,100.,1000, -1.1, 1.1);
+  fC24DistributionWhole = new TH2D((fName+"C24DistributionWhole").data(),";CentralityV0M;C_{2}{4}",100,0.,100.,1000, -1.1, 1.1);
 }
 
 TList *AliZDCcumulantFlow::CreateCorrelations() {
@@ -199,21 +212,29 @@ TList *AliZDCcumulantFlow::CreateCorrelations() {
   correlation_list->SetName(fName.data());
   auto ptbins = fAxisPt->GetXbins()->GetArray();
   auto nptbins = fAxisPt->GetNbins();
-  fC22 = new TProfile("C22",";CentralityV0M;C_{2}{2}",100,0.,100.);
-  correlation_list->Add(fC22);
   auto etagap = std::to_string(fEtaGap*2.);
   auto eta_gap_axes = std::string(";CentralityV0M;C_{2}{2,#Delta#eta>"+etagap+"}");
+  fC22 = new TProfile("C22",";CentralityV0M;C_{2}{2}",100,0.,100.);
   fC22EtaGap = new TProfile("C22EtaGap",eta_gap_axes.data(),100,0.,100.);
-  correlation_list->Add(fC22EtaGap);
   fC24 = new TProfile("C24",";CentralityV0M;C_{2}{4}",100,0.,100.);
-  correlation_list->Add(fC24);
   fCdif22 = new TProfile2D("Cdif22",";Centrality V0M;#it{p}_{T} / GeV/#it{c};C'_{2}{2}",100,0.,100.,nptbins, ptbins);
-  correlation_list->Add(fCdif22);          
-  fCdif24 = new TProfile2D("Cdif24",";Centrality V0M;#it{p}_{T} / GeV/#it{c};C'_{2}{4}",100,0.,100.,nptbins, ptbins);
-  correlation_list->Add(fCdif24);
   eta_gap_axes += "#it{p}_{T} / GeV/#it{c}";
   fCdif22EtaGap = new TProfile2D("Cdif22EtaGap",eta_gap_axes.data(),100,0.,100.,nptbins, ptbins);
+  fCdif24 = new TProfile2D("Cdif24",";Centrality V0M;#it{p}_{T} / GeV/#it{c};C'_{2}{4}",100,0.,100.,nptbins, ptbins);
+  correlation_list->Add(fC22);
+  correlation_list->Add(fC22EtaGap);
+  correlation_list->Add(fC24);
+  correlation_list->Add(fCdif22);          
   correlation_list->Add(fCdif22EtaGap);
+  correlation_list->Add(fCdif24);
+
+  eta_gap_axes = std::string(";CentralityV0M;#||{Q};C_{2}{2,#Delta#eta>"+etagap+"}");
+  fC22ESE = new TProfile2D("C22ESE",";CentralityV0M;#||{Q};C_{2}{2}",100,0.,100.,200,0,2.);
+  fC22EtaGapESE = new TProfile2D("C22EtaGapESE",eta_gap_axes.data(),100,0.,100.,200,0,2.);
+  fC24ESE = new TProfile2D("C24ESE",";CentralityV0M;#||{Q};C_{2}{4}",100,0.,100.,200,0,2.);
+  correlation_list->Add(fC22ESE);
+  correlation_list->Add(fC22EtaGapESE);
+  correlation_list->Add(fC24ESE);
 
   auto bootstrap_list = new TList();
   bootstrap_list->SetOwner(true);
@@ -249,28 +270,54 @@ void AliZDCcumulantFlow::AddCorrectionsToList(TList* hlist, TList *qalist) {
   nua_qa_list->Add(fMultC24);
   nua_qa_list->Add(fC22Distribution);
   nua_qa_list->Add(fC24Distribution);
+  nua_qa_list->Add(fC22DistributionWhole);
+  nua_qa_list->Add(fC24DistributionWhole);
   fCuts.AddQAHistograms(nua_qa_list);
   qalist->Add(nua_qa_list);
 }
 
-TProfile3D* AliZDCcumulantFlow::ReadFromOADB(TFile *file, const std::string &oadb_name, Int_t run_number) {
+TH3D* AliZDCcumulantFlow::ReadFromOADB(TFile *file, const std::string &oadb_name, Int_t run_number) {
   auto check_histo = [](TH1* histo){ 
     for (int i = 0; i < histo->GetNbinsX(); ++i) {
       if (std::isnan(histo->GetBinContent(i)) || std::isnan(histo->GetBinError(i))) return false;
     }
     return true;
   };
-  TProfile3D *ret = nullptr;
+  TH3D *ret = nullptr;
   fIsApplied = false;
   auto oadb = dynamic_cast<AliOADBContainer*>(file->Get(oadb_name.data()));
   if (oadb) {
-    auto profile = dynamic_cast<TProfile3D*>(oadb->GetObject(run_number));
-    if (profile && profile->GetEntries() > 0. && check_histo(profile)) {
-      ret = profile;
+    auto nua = dynamic_cast<TH3D*>(oadb->GetObject(run_number));
+    if (nua && nua->GetEntries() > 0. && check_histo(nua)) {
+      ret = nua;
       fIsApplied = true;
     }
   }
   return ret;
+}
+
+void AliZDCcumulantFlow::ScaleNUA(TH3D* unscaled, TH3D* scaled) {
+  auto phi_axis = unscaled->GetXaxis();
+  auto eta_axis = unscaled->GetYaxis();
+  auto vtx_axis = unscaled->GetZaxis();
+  TH1D* proj = nullptr;
+  for (auto ivtx = 1; ivtx <= vtx_axis->GetNbins(); ++ivtx) {
+    vtx_axis->SetRange(ivtx, ivtx);
+    if (unscaled->Integral() < 1) continue;
+    for (auto ieta = 1; ieta <= eta_axis->GetNbins(); ++ieta) {
+      eta_axis->SetRange(ieta, ieta);
+      if (unscaled->Integral() < 1) continue;
+      proj = dynamic_cast<TH1D*>(unscaled->Project3D("x"));
+      auto max = proj->GetMaximum();
+      for (auto iphi = 1; iphi <= phi_axis->GetNbins(); ++iphi) {
+        auto ntracks = unscaled->GetBinContent(iphi, ieta, ivtx);
+        auto entracks = unscaled->GetBinError(iphi, ieta , ivtx);
+        scaled->SetBinContent(iphi, ieta , ivtx, ntracks / max);
+        scaled->SetBinError(iphi, ieta , ivtx, entracks / max);
+      }
+      delete proj;
+    }
+  }
 }
 
 void AliZDCcumulantFlow::OpenCorrection(TFile *file, Int_t run_number) {
@@ -280,5 +327,9 @@ void AliZDCcumulantFlow::OpenCorrection(TFile *file, Int_t run_number) {
     if (fNUAweightsIn) fIsApplied = true;
     if (fIsApplied) fAreNUAapplied->Fill(1.);
     else            fAreNUAapplied->Fill(0.);
+    if (fIsApplied) {
+      std::cout << "NUA weights "<< fNUAweightsIn->GetName() << " found." << std::endl;
+      ScaleNUA(fNUAweightsIn, fNUAweightsScaled);
+    }
   }
 }

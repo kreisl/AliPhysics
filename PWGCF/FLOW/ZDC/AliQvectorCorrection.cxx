@@ -39,7 +39,7 @@ void AliQvectorCorrection1D::Configure(std::string name, std::string var_name, s
   fIsConfigured = true;
 }
 
-AliQvector AliQvectorCorrection1D::Correct(const AliQvector &q_vector, const double var_a, const double var_b) const {
+AliQvector AliQvectorCorrection1D::Correct(const AliQvector &q_vector, const double var_a, const double var_b, const double var_c) const {
   AliQvector ret = q_vector;
   fXmeanOut->Fill(var_a, q_vector.x);
   fYmeanOut->Fill(var_a, q_vector.y);
@@ -121,7 +121,7 @@ void AliQvectorCorrection1DInterpolate::Configure(std::string name, std::string 
   fIsConfigured = true;
 }
 
-AliQvector AliQvectorCorrection1DInterpolate::Correct(const AliQvector &q_vector, const double var_a, const double var_b) const {
+AliQvector AliQvectorCorrection1DInterpolate::Correct(const AliQvector &q_vector, const double var_a, const double var_b, const double var_c) const {
   AliQvector ret = q_vector;
   fXmeanOut->Fill(var_a, q_vector.x);
   fYmeanOut->Fill(var_a, q_vector.y);
@@ -209,7 +209,7 @@ void AliQvectorCorrection2D::Configure(std::string name,
   fBinEdgesVarB = var_b_bin_edges;
 }
 
-AliQvector AliQvectorCorrection2D::Correct(const AliQvector &q_vector, const double var_a, const double var_b) const {
+AliQvector AliQvectorCorrection2D::Correct(const AliQvector &q_vector, const double var_a, const double var_b, const double var_c) const {
   AliQvector ret = q_vector;
   fXmeanOut->Fill(var_a, var_b, q_vector.x);
   fYmeanOut->Fill(var_a, var_b, q_vector.y);

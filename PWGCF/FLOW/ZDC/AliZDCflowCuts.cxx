@@ -35,7 +35,7 @@ void AliZDCflowCuts::AddQAHistograms(TList *list) {
   fHistDCAxy = new TH2D("dcaxy", ";dcaxy;cuts applied;N", 200, 0., 5., 2, 0., 2.);
   fHistDCAz = new TH2D("dcaz", ";dcaz;cuts applied;N", 200, 0., 5., 2, 0., 2.);
   std::vector<Double_t> pt_bins {
-    0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.,
+    0., 0.15, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.,
     1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 3.,3.25, 3.5,
     3.75, 4., 4.5, 5., 5.5, 6., 7., 8., 9., 10.,
     12., 14., 17., 20., 25., 30., 40., 50.};    
@@ -59,9 +59,8 @@ void AliZDCflowCuts::AddQAHistograms(TList *list) {
 }
 
 bool AliZDCflowCuts::CheckTrackCutsPtCutOnly(AliAODTrack* track) {
-  if (!(track->Pt() >= ptMin)) return false;
-  if (!(track->Pt() <  ptMax)) return false;
-  return true;
+  if (track->Pt() >= ptMin && track->Pt() < ptMax) return true;
+  return false;
 }
 
 bool AliZDCflowCuts::CheckTrackCutsNoPtCut(AliAODTrack* track) {

@@ -21,7 +21,11 @@ class AliZDCanalysis : public TObject {
    virtual void FindCentralityBin(AliAODEvent *event, Double_t centrality, const std::vector<Int_t> &samples) = 0;
    AliZDCflowCuts& Cuts() { return fCuts; }
    void AddQAHistograms(TList* qa) {
-     fCuts.AddQAHistograms(qa);
+     auto qalist = new TList();
+     qalist->SetName((fName+"_QA").c_str());
+     qalist->SetOwner(true);
+     fCuts.AddQAHistograms(qalist);
+     qa->Add(qalist);
    }
    inline void SetQvectors(std::map<std::string, AliZDCQvectors> &qv_map) {
      fQZA = qv_map[fQvectorName].za;
@@ -42,7 +46,7 @@ class AliZDCanalysis : public TObject {
     Int_t fNsamples = 10;                                  /// Number of samples
     std::vector<Int_t> fSamples = std::vector<Int_t>(fNsamples);
     std::string fName = "default";
-    std::string fQvectorName = "plain";
+    std::string fQvectorName = "nd";
     Double_t fCentrality = -1.;
     AliZDCflowCuts fCuts;
     AliQvector fQZA; //!<! 

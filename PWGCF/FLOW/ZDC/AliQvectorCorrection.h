@@ -15,7 +15,7 @@ class AliQvectorCorrection : public TObject {
  public:
   AliQvectorCorrection() = default;
   AliQvectorCorrection(std::string name, bool equalize);
-  virtual AliQvector Correct(const AliQvector &q_vector, double var_a, double var_b = 0.) const = 0;
+  virtual AliQvector Correct(const AliQvector &q_vector, double var_a, double var_b = 0., double var_c = 0.) const = 0;
   virtual void OpenCorrection(TFile *corrections_file, Int_t run_number) = 0;
   virtual void AddCorrectionsToList(TList *hlist, TList *qalist) = 0;
   bool IsApplied() const { return fIsApplied; }
@@ -32,7 +32,7 @@ class AliQvectorCorrection1DInterpolate : public AliQvectorCorrection {
   AliQvectorCorrection1DInterpolate() = default;
   void Configure(std::string name, std::string var_name,
                  std::vector<Double_t> bin_edges, bool equalize);
-  AliQvector Correct(const AliQvector &q_vector, double var_a, double var_b = 0.) const final;
+  AliQvector Correct(const AliQvector &q_vector, double var_a, double var_b = 0., double var_c = 0.) const final;
   void OpenCorrection(TFile *file, Int_t run_number) final;
   void AddCorrectionsToList(TList *hlist, TList *qalist) final;
  private:
@@ -59,7 +59,7 @@ class AliQvectorCorrection1D : public AliQvectorCorrection {
   AliQvectorCorrection1D() = default;
   void Configure(std::string name, std::string var_name,
                  std::vector<Double_t> bin_edges, bool equalize);
-  AliQvector Correct(const AliQvector &q_vector, double var_a, double var_b = 0.) const final;
+  AliQvector Correct(const AliQvector &q_vector, double var_a, double var_b = 0., double var_c = 0.) const final;
   void OpenCorrection(TFile *file, Int_t run_number) final;
   void AddCorrectionsToList(TList *hlist, TList *qalist) final;
  private:
@@ -88,7 +88,7 @@ class AliQvectorCorrection2D : public AliQvectorCorrection {
                  std::string var_a_name, std::vector<Double_t> var_a_bin_edges,
                  std::string var_b_name, std::vector<Double_t> var_b_bin_edges,
                  bool equalize);
-  AliQvector Correct(const AliQvector &, double var_a, double var_b) const final;
+  AliQvector Correct(const AliQvector &q_vector, double var_a, double var_b = 0., double var_c = 0.) const final;
   void OpenCorrection(TFile *file, Int_t run_number) final;
   void AddCorrectionsToList(TList *hlist, TList *qalist) final;
  private:
@@ -117,4 +117,5 @@ class AliQvectorCorrection2D : public AliQvectorCorrection {
  ClassDef(AliQvectorCorrection2D, 3);
  /// \endcond
 };
+
 #endif

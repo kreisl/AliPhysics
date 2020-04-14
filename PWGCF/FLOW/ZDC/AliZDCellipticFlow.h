@@ -31,8 +31,6 @@ class AliZDCellipticFlow : public AliZDCanalysis {
     fPtBins = pt_bins;
   }
  private:
-  std::string fQvectorName;
-  bool fRequireGainEq = false;
   const Double_t centBins[fNcentBins+1] = {0.,5.,10.,20.,30.,40.,50.,60.,70.,80.,90.};
   std::vector<double> fPtBins;
   TAxis *fCentralityAxis;
@@ -65,6 +63,7 @@ class AliZDCellipticFlow : public AliZDCanalysis {
 
   TH1D* fPt[fNcentBins]; //!<! pt QA histograms
 
+  TH2D*       fPtCent;      //!<! pt in centrality classes 
   TProfile2D* fV2XXXpTcent; //!<! v2 vs pt in centrality classes 
   TProfile2D* fV2XYYpTcent; //!<! v2 vs pt in centrality classes
   TProfile2D* fV2YXYpTcent; //!<! v2 vs pt in centrality classes
