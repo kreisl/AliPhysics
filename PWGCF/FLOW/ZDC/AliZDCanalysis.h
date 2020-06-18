@@ -18,6 +18,9 @@ class AliZDCanalysis : public TObject {
    AliZDCanalysis(std::string name) : fName(name) { }
    virtual ~AliZDCanalysis() = default;
    virtual TList *CreateCorrelations() = 0;
+   void SetCentralityWeight(double weight) {
+     fCentralityWeight = weight;
+   }
    virtual void FindCentralityBin(AliAODEvent *event, Double_t centrality, const std::vector<Int_t> &samples) = 0;
    AliZDCflowCuts& Cuts() { return fCuts; }
    void AddQAHistograms(TList* qa) {
@@ -27,9 +30,13 @@ class AliZDCanalysis : public TObject {
      fCuts.AddQAHistograms(qalist);
      qa->Add(qalist);
    }
-   inline void SetQvectors(std::map<std::string, AliZDCQvectors> &qv_map) {
-     fQZA = qv_map[fQvectorName].za;
-     fQZC = qv_map[fQvectorName].zc;
+   inline void SetQvectorsZDC(std::map<std::string, AliZDCQvectors> &qv_map) {
+     fQZA = qv_map[fQvectorName].a;
+     fQZC = qv_map[fQvectorName].c;
+   }
+   inline void SetQvectorsV0(std::map<std::string, AliZDCQvectors> &qv_map) {
+     fQVA = qv_map[fQvectorName].a;
+     fQVC = qv_map[fQvectorName].c;
    }
    void ReadYAMLnode(YAML::Node& node) {
      auto analysis_settings = node["analysis_settings"];
@@ -42,15 +49,19 @@ class AliZDCanalysis : public TObject {
      fNsamples = n;
      fSamples.resize(n);
    }
+   std::string Name() const {return fName;}
   protected:
     Int_t fNsamples = 10;                                  /// Number of samples
     std::vector<Int_t> fSamples = std::vector<Int_t>(fNsamples);
     std::string fName = "default";
     std::string fQvectorName = "nd";
     Double_t fCentrality = -1.;
+    Double_t fCentralityWeight = 1.;
     AliZDCflowCuts fCuts;
     AliQvector fQZA; //!<! 
     AliQvector fQZC; //!<! 
+    AliQvector fQVA; //!<! 
+    AliQvector fQVC; //!<! 
 
     template<typename T>
     void ParseValue(T& value, YAML::Node node, std::string name) {

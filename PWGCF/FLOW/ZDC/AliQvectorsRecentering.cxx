@@ -15,9 +15,9 @@
 
 #include <iostream>
 #include "AliOADBContainer.h"
-#include "AliQvectorCorrectionND.h"
+#include "AliQvectorsRecenteringND.h"
 
-void AliQvectorCorrectionND::Configure(std::string name,
+void AliQvectorsRecenteringND::Configure(std::string name,
                                        const std::vector<TAxis*> &axes,
                                        const std::vector<std::string> &rbr_axes,
                                        bool equalize,
@@ -29,14 +29,14 @@ void AliQvectorCorrectionND::Configure(std::string name,
   for (auto &axis : axes) fAxes.Add(axis);
 }
 
-void AliQvectorCorrectionND::Make(TFile *file, int run_number, TList *corrections, TList *qa) {
+void AliQvectorsRecenteringND::Make(TFile *file, int run_number, TList *corrections, TList *qa) {
   OpenAxes(file, run_number);
   AddHistogramsToList(corrections);
   AddQAToList(qa);
-  OpenCorrection(file, run_number);
+  OpensRecentering(file, run_number);
 }
 
-AliQvector AliQvectorCorrectionND::Apply(const AliQvector q_vector, double *variables) {
+AliQvector AliQvectorsRecenteringND::Apply(const AliQvector q_vector, double *variables) {
   AliQvector rec = q_vector;
   fSumXout->Fill(variables, q_vector.x);
   fSumYout->Fill(variables, q_vector.y);
@@ -73,7 +73,7 @@ AliQvector AliQvectorCorrectionND::Apply(const AliQvector q_vector, double *vari
 }
 
 
-void AliQvectorCorrectionND::OpenAxes(TFile *file, int run_number) {
+void AliQvectorsRecenteringND::OpenAxes(TFile *file, int run_number) {
   if (!file || file->IsZombie()) return;
   for (auto &name : fRunByRunAxes) {
     auto axis = dynamic_cast<TAxis*>(fAxes.FindObject(name.c_str()));
@@ -86,18 +86,15 @@ void AliQvectorCorrectionND::OpenAxes(TFile *file, int run_number) {
   }
 }
 
-void AliQvectorCorrectionND::OpenCorrection(TFile *file, int run_number) {
+void AliQvectorsRecenteringND::OpenCorrection(TFile *file, int run_number) {
   if (!file || file->IsZombie()) return;
   fSumXin.reset(ReadFromOADB<THnF>(file, fSumXout->GetName(), run_number));
   fSumYin.reset(ReadFromOADB<THnF>(file, fSumYout->GetName(), run_number));
   fSumWin.reset(ReadFromOADB<THnF>(file, fSumWout->GetName(), run_number));
-  if (fSumXin && fSumYin && fSumWin) {
-    fIsApplied = true;
-    std::cout << fName << " ND recentering is applied" << std::endl;
-  }
+  if (fSumXin && fSumYin && fSumWin) fIsApplied = true;
 }
 
-void AliQvectorCorrectionND::AddHistogramsToList(TList *list) {
+void AliQvectorsRecenteringND::AddHistogramsToList(TList *list) {
   std::string axestitles;
   for (const auto &&obj : fAxes) axestitles += std::string(";") + obj->GetName();
   ConfigureTHn(&fSumXout, fName+"_X", axestitles);
@@ -108,7 +105,7 @@ void AliQvectorCorrectionND::AddHistogramsToList(TList *list) {
   list->Add(fSumWout);
 }
 
-void AliQvectorCorrectionND::AddQAToList(TList *list) {
+void AliQvectorsRecenteringND::AddQAToList(TList *list) {
   std::string axestitles;
   for (const auto &&obj : fAxes) axestitles += std::string(";") + obj->GetName();
   ConfigureTHn(&fSumXqa, fName+"_X_QA", axestitles);
@@ -121,7 +118,7 @@ void AliQvectorCorrectionND::AddQAToList(TList *list) {
   list->Add(fEntriesQA);
 }
 
-void AliQvectorCorrectionND::ConfigureTHn(THnF **thn, 
+void AliQvectorsRecenteringND::ConfigureTHn(THnF **thn, 
                                           std::string name, 
                                           std::string title) {
     std::vector<int> nbins;

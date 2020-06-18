@@ -1,5 +1,5 @@
-#ifndef ALIQVECTORCORRECTIONND_H
-#define ALIQVECTORCORRECTIONND_H
+#ifndef ALIQVECTORSRECENTERING_H
+#define ALIQVECTORSRECENTERING_H
 
 /* Copyright(c) 1998-2020, ALICE Experiment at CERN, All rights reserved. *
  * See cxx source for full Copyright notice                               */
@@ -11,9 +11,7 @@
 #include "TFile.h"
 #include "TList.h"
 
-#include "AliOADBContainer.h"
-
-#include "AliQvector.h"
+#include "AliQvectors.h"
 
 class AliQvectorCorrectionND : public TObject {
  public:
@@ -24,9 +22,9 @@ class AliQvectorCorrectionND : public TObject {
                  int min_entries);
   void Make(TFile *file, int run_number, TList *corrections, TList *qa);
   AliQvector Apply(const AliQvector q_vector, double *variables);
-  bool IsApplied() {return fIsApplied;}
 
  private:
+  constexpr unsigned int kNharmonics = 4;
   bool fEqualization = false; 
   bool fIsApplied    = false;
   int fMinEntries = 0;
@@ -34,20 +32,20 @@ class AliQvectorCorrectionND : public TObject {
   std::vector<std::string> fRunByRunAxes;
   TList fAxes;
 
-  THnF *fSumXout; //!<! Correction histogram output
-  THnF *fSumYout; //!<! Correction histogram output
-  THnF *fSumWout; //!<! Correction histogram output
-  std::unique_ptr<THnF> fSumXin; //!<! Correction histogram input
-  std::unique_ptr<THnF> fSumYin; //!<! Correction histogram input
-  std::unique_ptr<THnF> fSumWin; //!<! Correction histogram input
+  std::array<THnF *fSumXout, kNharmonics>; //!<! Correction histogram output
+  std::array<THnF *fSumYout, kNharmonics>; //!<! Correction histogram output
+  std::array<THnF *fSumWout, kNharmonics>; //!<! Correction histogram output
+  std::array<std::unique_ptr<THnF> fSumXin, kNharmonics>; //!<! Correction histogram input
+  std::array<std::unique_ptr<THnF> fSumYin, kNharmonics>; //!<! Correction histogram input
+  std::array<std::unique_ptr<THnF> fSumWin, kNharmonics>; //!<! Correction histogram input
 
-  THnF *fSumXqa; //!<! Correction histogram output QA
-  THnF *fSumYqa; //!<! Correction histogram output QA
-  THnF *fSumWqa; //!<! Correction histogram output QA
-  THnF *fEntriesQA; //!<! Correction histogram output QA fills events
+  std::array<THnF *fSumXqa, kNharmonics>; //!<! Correction histogram output QA
+  std::array<THnF *fSumYqa, kNharmonics>; //!<! Correction histogram output QA
+  std::array<THnF *fSumWqa, kNharmonics>; //!<! Correction histogram output QA
+  std::array<THnF *fEntriesQA, kNharmonics>; //!<! Correction histogram output QA fills events
 
   void OpenAxes(TFile *clist, int run_number);
-  void OpenCorrection(TFile *file, int run_number);
+  void OpenCorrection(TFsle *file, int run_number);
   void AddHistogramsToList(TList *clist);
   void AddQAToList(TList *list);
 
@@ -66,3 +64,4 @@ class AliQvectorCorrectionND : public TObject {
 };
 
 #endif
+

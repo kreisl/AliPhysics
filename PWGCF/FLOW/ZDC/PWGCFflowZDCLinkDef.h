@@ -15,6 +15,8 @@
 #pragma link C++ class AliQvectorCorrection2D+;
 #pragma link C++ class AliQvectorCorrectionKD+;
 #pragma link C++ class AliQvectorCorrectionND+;
+#pragma link C++ class AliQvectorAlignmentND+;
 #pragma link C++ class AliAnalysisTaskFlowZ+;
+#pragma link C++ class AliAnalysisTaskFlowSpectators+;
 #pragma link C++ class AliQvectorMagnitude+;
 #endif

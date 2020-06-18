@@ -40,6 +40,7 @@ void AliZDCcumulantFlow::FindCentralityBin(AliAODEvent *event, Double_t centrali
   fVertexZ = vtx->GetZ();
   fCuts.HasPassedCentrality(centrality > 0. && centrality < 90.);
   fSamples = samples;
+  fPtEffCentBin = GetPtEfficiencyCentralityBin(fCentrality);
 }
 
 void AliZDCcumulantFlow::FillESE(double qzna, double qznc) {
@@ -54,25 +55,34 @@ void AliZDCcumulantFlow::FillPerTrackCorrelations(AliAODTrack *track) {
   bool is_reference_eta_gap_n = false;
   bool is_POI = false;
   bool is_POI_eta_gap = false;
-  const Double_t phi = track->Phi();
-  const Double_t eta = track->Eta();
-  const Double_t pt  = track->Pt(); 
-  double weight = 1.;
+  const auto phi = track->Phi();
+  const auto eta = track->Eta();
+  const auto pt  = track->Pt(); 
+  double weight_nue = 1.;
+  double weight_nua = 1.;
   if (fCuts.CheckTrackCutsPtCutOnly(track)) is_reference = true;
   if (fApplyNUA && fNUAweightsIn) {
-    auto bin = fNUAweightsScaled->FindBin(phi, eta, fVertexZ);
-    auto w = fNUAweightsScaled->GetBinContent(bin);
-    if (w > 0.) weight *= 1. / w;
+    auto w = fNUAweightsScaled->GetBinContent(
+        fNUAweightsScaled->FindBin(phi, eta, fVertexZ));
+    if (w > 0.) weight_nua = 1. / w;
     else return;
   }
-  if (fApplyNUA && fPtEfficiencyIn) {
-    auto w = fPtEfficiencyIn->GetBinContent(fPtEfficiencyIn->FindBin(pt));
-    if (w > 0.) weight *= 1. / w;
+  if (fApplyNUE &&
+      !fPtEfficienciesFit.empty() &&
+      !fPtEfficienciesSpline.empty()) {
+    auto w = 1.; 
+    if (pt < 3.) {
+      w = fPtEfficienciesSpline.at(fPtEffCentBin)->Eval(pt);
+    } else {
+      w = fPtEfficienciesFit.at(fPtEffCentBin)->Eval(pt);
+    }
+    if (w > 0.) weight_nue = 1. / w;
     else return;
   }
+  auto weight = weight_nua * weight_nue;
   if (fUseEtaGap) {
-    if      ( eta < -fEtaGap) is_reference_eta_gap_n = true;
-    else if ( eta >  fEtaGap) is_reference_eta_gap_p = true;
+    if      (eta < -fEtaGap) is_reference_eta_gap_n = true;
+    else if (eta >  fEtaGap) is_reference_eta_gap_p = true;
   }
   auto bin = fAxisPt->FindBin(pt) - 1;
   if (bin >= 0 && bin < fAxisPt->GetNbins()) {
@@ -92,12 +102,14 @@ void AliZDCcumulantFlow::FillPerTrackCorrelations(AliAODTrack *track) {
   if (is_reference_eta_gap_n && is_POI_eta_gap) fQetaGapP[bin].Fill(phi, weight);
   fNUAweightsOut->Fill(phi, eta, fVertexZ);
   if (fApplyNUA) fBeforeNUA->Fill(phi, eta, fVertexZ, 1.);
-  if (fApplyNUA) fAfterNUA->Fill(phi, eta, fVertexZ, weight);
+  if (fApplyNUA) fAfterNUA->Fill(phi, eta, fVertexZ, weight_nua);
   FillFilterBitQA(track);
 }
 
 void AliZDCcumulantFlow::CalculateCumulants() {
-  if (!fCuts.PassedEventCuts()) return;
+  if (!fCuts.PassedEventCuts()) {
+    ResetQvectors();
+  }
   auto n02 = TwoParticleRef(fRptCut, 0);
   auto n22 = TwoParticleRef(fRptCut, 2);
   auto n02eta = TwoParticleEtaGapRef(fRptCutetaGapN, fRptCutetaGapP, 0);
@@ -106,30 +118,30 @@ void AliZDCcumulantFlow::CalculateCumulants() {
   auto n24 = FourParticleRef(fRptCut,2);
   if (n02.real() > 0.) {
     auto value = (n22 / n02).real();
-    fC22->Fill(fCentrality, value, n02.real());
+    fC22->Fill(fCentrality, value, fCentralityWeight*n02.real());
     fC22Distribution->Fill(fCentrality, value, n02.real());
     fC22DistributionWhole->Fill(fCentrality, value, n02.real());
     if (fESE) {
-      fC22ESE->Fill(fCentrality,fQpercentileZNA   , value, n02.real());
-      fC22ESE->Fill(fCentrality,fQpercentileZNC+1., value, n02.real());
+      fC22ESE->Fill(fCentrality,fQpercentileZNA   , value, fCentralityWeight*n02.real());
+      fC22ESE->Fill(fCentrality,fQpercentileZNC+1., value, fCentralityWeight*n02.real());
     }
   }
   if (n02eta.real() > 0.) {
-    fC22EtaGap->Fill(fCentrality, (n22eta / n02eta).real(), n02eta.real());
+    fC22EtaGap->Fill(fCentrality, (n22eta / n02eta).real(), fCentralityWeight*n02eta.real());
     if (fESE) {
-      fC22EtaGapESE->Fill(fCentrality, fQpercentileZNA   , (n22eta / n02eta).real(), n02eta.real());
-      fC22EtaGapESE->Fill(fCentrality, fQpercentileZNC+1., (n22eta / n02eta).real(), n02eta.real());
+      fC22EtaGapESE->Fill(fCentrality, fQpercentileZNA   , (n22eta / n02eta).real(), fCentralityWeight*n02eta.real());
+      fC22EtaGapESE->Fill(fCentrality, fQpercentileZNC+1., (n22eta / n02eta).real(), fCentralityWeight*n02eta.real());
     }
   }
   if (n04.real() > 0.) {
     auto value = (n24 / n04).real();
-    fC24->Fill(fCentrality, value, n04.real());
+    fC24->Fill(fCentrality, value, fCentralityWeight*n04.real());
     fC24Distribution->Fill(fCentrality, value, n04.real());
     fC24DistributionWhole->Fill(fCentrality, value, n04.real());
     fMultC24->Fill(fCentrality, fRptCut(0,1).real());
     if (fESE) {
-      fC24ESE->Fill(fCentrality, fQpercentileZNA   , value, n04.real());
-      fC24ESE->Fill(fCentrality, fQpercentileZNC+1., value, n04.real());
+      fC24ESE->Fill(fCentrality, fQpercentileZNA   , value, fCentralityWeight*n04.real());
+      fC24ESE->Fill(fCentrality, fQpercentileZNC+1., value, fCentralityWeight*n04.real());
     }
   }
   for (int i = 0; i < fAxisPt->GetNbins(); ++i) {
@@ -140,22 +152,22 @@ void AliZDCcumulantFlow::CalculateCumulants() {
     auto d02eta = TwoParticleDif(fQetaGapP[i], fPetaGapP[i], fRetaGapN, 0);
     auto d24 = FourParticleDif(fQ[i], fP[i], fR, 2);
     auto d04 = FourParticleDif(fQ[i], fP[i], fR, 0);
-    if (d02.real() > 0.) fCdif22->Fill(fCentrality, pt, (d22 / d02).real(), d02.real());
-    if (d02eta.real() > 0.) fCdif22EtaGap->Fill(fCentrality, pt, (d22eta / d02eta).real(), d02eta.real());
-    if (d04.real() > 0.) fCdif24->Fill(fCentrality, pt, (d24 / d04).real(), d04.real());
+    if (d02.real() > 0.) fCdif22->Fill(fCentrality, pt, (d22 / d02).real(), fCentralityWeight*d02.real());
+    if (d02eta.real() > 0.) fCdif22EtaGap->Fill(fCentrality, pt, (d22eta / d02eta).real(), fCentralityWeight*d02eta.real());
+    if (d04.real() > 0.) fCdif24->Fill(fCentrality, pt, (d24 / d04).real(), fCentralityWeight*d04.real());
     for (int isample = 0; isample < fNsamples; ++isample) {
       for (int i = 0; i < fSamples[isample]; ++i) {
-        if (d02.real() > 0.) fCdif22BS[isample]->Fill(fCentrality, pt, (d22 / d02).real(), d02.real());
-        if (d02eta.real() > 0.) fCdif22EtaGapBS[isample]->Fill(fCentrality, pt, (d22eta / d02eta).real(), d02eta.real());
-        if (d04.real() > 0.) fCdif24BS[isample]->Fill(fCentrality, pt, (d24 / d04).real(), d04.real());
+        if (d02.real() > 0.) fCdif22BS[isample]->Fill(fCentrality, pt, (d22 / d02).real(), fCentralityWeight*d02.real());
+        if (d02eta.real() > 0.) fCdif22EtaGapBS[isample]->Fill(fCentrality, pt, (d22eta / d02eta).real(), fCentralityWeight*d02eta.real());
+        if (d04.real() > 0.) fCdif24BS[isample]->Fill(fCentrality, pt, (d24 / d04).real(), fCentralityWeight*d04.real());
       }
     }
   }
   for (int isample = 0; isample < fNsamples; ++isample) {
     for (int i = 0; i < fSamples[isample]; ++i) {
-      if (n02.real() > 0.) fC22BS[isample]->Fill(fCentrality, (n22 / n02).real(), n02.real());
-      if (n02eta.real() > 0.) fC22EtaGapBS[isample]->Fill(fCentrality, (n22eta / n02eta).real(), n02eta.real());
-      if (n04.real() > 0.) fC24BS[isample]->Fill(fCentrality, (n24 / n04).real(), n04.real());
+      if (n02.real() > 0.) fC22BS[isample]->Fill(fCentrality, (n22 / n02).real(), fCentralityWeight*n02.real());
+      if (n02eta.real() > 0.) fC22EtaGapBS[isample]->Fill(fCentrality, (n22eta / n02eta).real(), fCentralityWeight*n02eta.real());
+      if (n04.real() > 0.) fC24BS[isample]->Fill(fCentrality, (n24 / n04).real(), fCentralityWeight*n04.real());
     }
   }
   ResetQvectors();
@@ -197,7 +209,7 @@ void AliZDCcumulantFlow::Configure(double eta_gap, std::vector<double> pt_bins, 
   fNUAweightsScaled = new TH3D((fName+"_NUA_Scaled").data(),";#phi;#eta;vertex Z / cm", n_phi_bins, phi_bins.data(), n_eta_bins, eta_bins.data(), nvtxz, vtxz_bins.data());
   fBeforeNUA = new TH3D((fName+"_BeforeNUAqa").data(),";#phi;#eta;vertex Z / cm", n_phi_bins, phi_bins.data(), n_eta_bins, eta_bins.data(), nvtxz, vtxz_bins.data());
   fAfterNUA = new TH3D((fName+"_AfterNUAqa").data(),";#phi;#eta;vertex Z / cm", n_phi_bins, phi_bins.data(), n_eta_bins, eta_bins.data(), nvtxz, vtxz_bins.data());
-  fAreNUAapplied = new TH1D((fName+"_NUA_flag").data(),";are NUA weights appplied?;",2,0.,2.);
+  fAreWeightsApplied = new TH1D((fName+"_Weights_flag").data(),";are weights applied?;",2,0.,2.);
   fFilterBit = new TH1D((fName+"FilterBit").data(), ";filter bit;n tracks;" , 11, 0, 11.);
   fMultC24 = new TH2D((fName+"MultC24").data(),";CentralityV0M;multiplicity",100,0.,100.,5000, 0., 5000.);
   fC22Distribution = new TH2D((fName+"C22DistributionZoom").data(),";CentralityV0M;C_{2}{2}",100,0.,100.,1000, -0.02, 0.08);
@@ -255,6 +267,9 @@ TList *AliZDCcumulantFlow::CreateCorrelations() {
     bootstrap_list->Add(fCdif22EtaGapBS.back());
   }
   correlation_list->Add(bootstrap_list);
+
+  ResetQvectors();
+
   return correlation_list;
 }
 
@@ -263,7 +278,7 @@ void AliZDCcumulantFlow::AddCorrectionsToList(TList* hlist, TList *qalist) {
   auto nua_qa_list = new TList();
   nua_qa_list->SetName((fName+"_QA").data());
   nua_qa_list->SetOwner(true);
-  nua_qa_list->Add(fAreNUAapplied);
+  nua_qa_list->Add(fAreWeightsApplied);
   nua_qa_list->Add(fBeforeNUA);
   nua_qa_list->Add(fAfterNUA);
   nua_qa_list->Add(fFilterBit);
@@ -284,14 +299,18 @@ TH3D* AliZDCcumulantFlow::ReadFromOADB(TFile *file, const std::string &oadb_name
     return true;
   };
   TH3D *ret = nullptr;
-  fIsApplied = false;
+  bool applied = false;
   auto oadb = dynamic_cast<AliOADBContainer*>(file->Get(oadb_name.data()));
   if (oadb) {
     auto nua = dynamic_cast<TH3D*>(oadb->GetObject(run_number));
     if (nua && nua->GetEntries() > 0. && check_histo(nua)) {
       ret = nua;
-      fIsApplied = true;
+      applied = true;
     }
+  }
+  if (applied) {
+    fAreWeightsApplied->Fill(0.);
+    std::cout << "NUA weights "<< ret->GetName() << " found." << std::endl;
   }
   return ret;
 }
@@ -320,16 +339,38 @@ void AliZDCcumulantFlow::ScaleNUA(TH3D* unscaled, TH3D* scaled) {
   }
 }
 
+void AliZDCcumulantFlow::OpenPtEfficiencies(TFile *file) {
+  if (file && !file->IsZombie()) { 
+    std::vector<TString> names = {  "<5", "5-10","10-20",
+                                  "20-30","30-40","40-50",
+                                  "50-60","60-70",">70"};
+    bool applied = true;
+    for (unsigned int i = 0; i < names.size(); ++i) {
+      auto histo = (TH1D*) file->Get(Form("eff_unbiased_%i",i));
+      if (histo) {
+        auto spline = new TSpline3(histo);
+        auto fit = new TF1(TString("f1")+names[i], "pol3",5, 30);
+        histo->Fit(fit, "Q0N","",3.,20.);
+        spline->SetName(names[i]);
+        fPtEfficienciesFit.push_back(fit); 
+        fPtEfficienciesSpline.push_back(spline); 
+      } else {
+        applied = false;
+      }
+    }
+    if (applied) fAreWeightsApplied->Fill(1.);
+  }
+}
+
 void AliZDCcumulantFlow::OpenCorrection(TFile *file, Int_t run_number) {
+  if (!file || file->IsZombie()) return;
   if (fApplyNUA) {
-    if (!file || file->IsZombie()) return;
     fNUAweightsIn = ReadFromOADB(file, fNUAweightsOut->GetName(), run_number);
-    if (fNUAweightsIn) fIsApplied = true;
-    if (fIsApplied) fAreNUAapplied->Fill(1.);
-    else            fAreNUAapplied->Fill(0.);
-    if (fIsApplied) {
-      std::cout << "NUA weights "<< fNUAweightsIn->GetName() << " found." << std::endl;
+    if (fNUAweightsIn) {
       ScaleNUA(fNUAweightsIn, fNUAweightsScaled);
     }
+  }
+  if (fApplyNUE) {
+    OpenPtEfficiencies(file);
   }
 }

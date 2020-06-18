@@ -35,12 +35,14 @@ set(SRCS
   AliQvectorCorrection.cxx
   AliQvectorCorrectionKD.cxx
   AliQvectorCorrectionND.cxx
+  AliQvectorAlignmentND.cxx
   AliZDCgainEq.cxx
   AliZDCflowCuts.cxx
   AliZDCdirectedFlow.cxx
   AliZDCellipticFlow.cxx
   AliZDCcumulantFlow.cxx
   AliAnalysisTaskFlowZ.cxx
+  AliAnalysisTaskFlowSpectators.cxx
   AliQvectorMagnitude.cxx
   )
 # Headers from sources
@@ -48,6 +50,7 @@ string(REPLACE ".cxx" ".h" HDRS "${SRCS}")
 set(HDRS
   "${HDRS}"
   AliZDCanalysis.h
+  AliQvectors.h
   )
 
 # Generate the dictionary

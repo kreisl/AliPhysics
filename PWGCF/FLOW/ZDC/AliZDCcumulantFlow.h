@@ -12,11 +12,16 @@
 #include <iostream>
 #include "TObject.h"
 #include "TAxis.h"
+#include "TH1.h"
+#include "TSpline.h"
+#include "TF1.h"
 #include "TProfile3D.h"
 #include "AliQvector.h"
+#include "AliQvectors.h"
 #include "AliZDCflowCuts.h"
 #include "AliZDCanalysis.h"
 #include "AliAODTrack.h"
+
 #include "yaml-cpp/yaml.h"
 
 class TList;
@@ -26,54 +31,18 @@ class TProfile2D;
 class AliAODEvent;
 
 class AliZDCcumulantFlow : public AliZDCanalysis {
-  public:
-  template <unsigned int Harmonics, unsigned int Powers>
-  struct Qv {
-    static const unsigned int kMaxH = Harmonics;
-    static const unsigned int kMaxP = Powers;
-    static constexpr std::size_t kSize = (kMaxH*2+1)*(kMaxP); 
-    std::array<std::complex<double>, kSize> qv_;
-    std::complex<double> operator()(const int ih, const int ip) const {
-      return qv_[index(ih,ip)];
-    }
-    std::complex<double> &ref(const int ih, const int ip) {
-      return qv_[index(ih,ip)];
-    }
-    unsigned int index(const int ih, const int ip) const {
-      auto x = (ih + kMaxH) * (kMaxP) + (ip-1);
-      return x;
-    }
-    void Fill(double phi, double weight) {
-      std::array<double, Harmonics+1> cos_arr;
-      std::array<double, Harmonics+1> sin_arr;
-      for (auto h = 1u; h <= Harmonics; ++h) {
-        cos_arr[h] = std::cos(h*phi);
-        sin_arr[h] = std::sin(h*phi);
-      }
-      for (auto p = 1u; p <= Powers; ++p) {
-        auto prefactor = std::pow(weight, p);
-        ref(0,p)  += std::complex<double>(prefactor, 0);
-        for (auto h = 1u; h <= Harmonics; ++h) {
-          ref(h,p)  += std::complex<double>(prefactor*cos_arr[h],
-                                            prefactor*sin_arr[h]);
-          ref(-h,p) += std::complex<double>( prefactor*cos_arr[h],
-                                            -prefactor*sin_arr[h]);
-        }
-      }
-    }
-    void Reset() {
-      for (auto & q : qv_) {
-        q = std::complex<double>(0., 0.);
-      }
-    }
-  };
  public:
   AliZDCcumulantFlow() = default;
   AliZDCcumulantFlow(std::string name);
   virtual ~AliZDCcumulantFlow() {
     delete fAxisPt;
     delete fNUAweightsIn;
-    delete fPtEfficiencyIn;
+    for (auto spline : fPtEfficienciesSpline) {
+      delete spline;
+    }
+    for (auto fit : fPtEfficienciesFit) {
+      delete fit;
+    }
   }
   void FindCentralityBin(AliAODEvent *event, Double_t centrality, const std::vector<Int_t> &samples);
   void OpenCorrection(TFile *file, Int_t run_number); 
@@ -83,7 +52,6 @@ class AliZDCcumulantFlow : public AliZDCanalysis {
                  int n_phi_bins, int n_eta_bins, double eta_min, double eta_max);
   TList *CreateCorrelations();
   void FillPerTrackCorrelations(AliAODTrack *track);
-  bool IsApplied() const { return fIsApplied; }
   void CalculateCumulants();
   void FillESE(double qzna, double qznc);
 
@@ -97,22 +65,46 @@ class AliZDCcumulantFlow : public AliZDCanalysis {
     auto analysis_settings = node["analysis_settings"];
     if (analysis_settings.IsDefined()) {
       ParseFlag(fApplyNUA, analysis_settings, "nua_weights");
+      ParseFlag(fApplyNUE, analysis_settings, "nue_weights");
     }
     fCuts.ReadYAMLnode(node);
   }
 
+  void OpenPtEfficiencies(TFile *file);
+
+  std::vector<Qv<4,4>> GetQTPCpt() {return fP;}
+  Qv<4,4> GetQTPC() {return fR;}
+
+  Qv<4,4> GetQTPCEtaNeg() {return fRptCutetaGapN;}
+  Qv<4,4> GetQTPCEtaPos() {return fRptCutetaGapP;}
+
  private:
+  unsigned int GetPtEfficiencyCentralityBin(double c) {
+    unsigned int i = 9;
+    if ( c < 5.) i = 0;
+    else if ( 5. < c && c < 10.) i = 1;
+    else if (10. < c && c < 20.) i = 2;
+    else if (20. < c && c < 30.) i = 3;
+    else if (30. < c && c < 40.) i = 4;
+    else if (40. < c && c < 50.) i = 5;
+    else if (50. < c && c < 60.) i = 6;
+    else if (60. < c && c < 70.) i = 7;
+    else if (c > 70.) i = 8;
+    return i;
+  }
   void ResetQvectors();
   TH3D* ReadFromOADB(TFile *file, const std::string&oadb_name, Int_t run_number);
   void ScaleNUA(TH3D* unscaled, TH3D* scaled);
 
   bool fUseEtaGap = false;
-  bool fIsApplied = false;
   bool fApplyNUA  = true;
+  bool fApplyNUE  = true;
+  int  fPtEffCentBin = 9;
   double fEtaGap = 0.5;
   double fPtMax = -1.;
   double fPtMin = -1.;
   Double_t fVertexZ = 0.;
+
 
   Int_t fNsamples = 10;                                  /// Number of samples
   std::vector<Int_t> fSamples = std::vector<Int_t>(fNsamples);
@@ -126,13 +118,13 @@ class AliZDCcumulantFlow : public AliZDCanalysis {
   Qv<4,4> fRetaGapN;              //!<!
   std::vector<Qv<4,4>> fPetaGapP; //!<!
   std::vector<Qv<4,4>> fQetaGapP; //!<!
-  TAxis* fAxisPt = nullptr;                    //!<! p_T axis
-  TH1D* fPtEfficiencyIn = nullptr;             //!<! pt efficiency
-  TH1D* fAreNUAapplied = nullptr;
+  TAxis* fAxisPt = nullptr;       //!<! p_T axis
+  std::vector<TF1*> fPtEfficienciesFit; //!<! pt efficiency
+  std::vector<TSpline3*> fPtEfficienciesSpline; //!<! pt efficiency
+  TH1D* fAreWeightsApplied = nullptr;
   TH3D* fNUAweightsIn = nullptr;
   TH3D* fNUAweightsScaled = nullptr;
   TH3D* fNUAweightsOut = nullptr;
-  TH3D* fNUAweightsNtracksTemp = nullptr; //!<! nua weight eta phi vtx z
   TH3D* fAfterNUA = nullptr;              //!<! nua weight eta phi vtx z
   TH3D* fBeforeNUA = nullptr;             //!<! nua weight eta phi vtx z
   TH1D* fFilterBit = nullptr;

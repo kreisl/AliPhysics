@@ -10,6 +10,7 @@
 #include "AliQvector.h"
 #include "AliZDCflowCuts.h"
 #include "AliZDCanalysis.h"
+#include "AliZDCcumulantFlow.h"
 
 class AliAODEvent;
 class AliAODTrack;
@@ -29,13 +30,33 @@ class AliZDCellipticFlow : public AliZDCanalysis {
   void FillPerEventCorrelations();
   void SetPtBins(const std::vector<double> &pt_bins) {
     fPtBins = pt_bins;
+    auto npt = pt_bins.size()-1;
+    fAxisPt = new TAxis(npt, pt_bins.data());
   }
+  void CalculateCorrelations(Qv<4,4> qtpc,
+                             std::vector<Qv<4,4>> qtpcpt,
+                             Qv<4,4> qtpcetap,
+                             Qv<4,4> qtpcetan);
  private:
   const Double_t centBins[fNcentBins+1] = {0.,5.,10.,20.,30.,40.,50.,60.,70.,80.,90.};
   std::vector<double> fPtBins;
   TAxis *fCentralityAxis;
+  TAxis* fAxisPt = nullptr;       //!<! p_T axis
   Int_t fCentralityBin = -1;
 
+  TProfile* fVXaZXXCent = nullptr; //!<! Correlation V0 ZNA ZNC Resolution
+  TProfile* fVXcZXXCent = nullptr; //!<! Correlation V0 ZNA ZNC Resolution
+  TProfile* fVXaVXcCent = nullptr; //!<! Correlation V0 ZNA ZNC Resolution
+  TProfile* fVYaZYYCent = nullptr; //!<! Correlation V0 ZNA ZNC Resolution
+  TProfile* fVYcZYYCent = nullptr; //!<! Correlation V0 ZNA ZNC Resolution
+  TProfile* fVYaVYcCent = nullptr; //!<! Correlation V0 ZNA ZNC Resolution
+
+  TProfile* fTXaZXXCent = nullptr; //!<! Correlation TPC ZNA ZNC 3 subevent Resolution
+  TProfile* fTXcZXXCent = nullptr; //!<! Correlation TPC ZNA ZNC 3 subevent Resolution
+  TProfile* fTXaTXcCent = nullptr; //!<! Correlation TPC ZNA ZNC 3 subevent Resolution
+  TProfile* fTYaZYYCent = nullptr; //!<! Correlation TPC ZNA ZNC 3 subevent Resolution
+  TProfile* fTYcZYYCent = nullptr; //!<! Correlation TPC ZNA ZNC 3 subevent Resolution
+  TProfile* fTYaTYcCent = nullptr; //!<! Correlation TPC ZNA ZNC 3 subevent Resolution
 
   TProfile* fXaXcCent = nullptr; //!<! Correlation ZNA ZNC Resolution
   TProfile* fYaYcCent = nullptr; //!<! Correlation ZNA ZNC Resolution

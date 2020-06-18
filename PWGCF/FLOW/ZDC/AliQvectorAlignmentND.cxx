@@ -15,65 +15,66 @@
 
 #include <iostream>
 #include "AliOADBContainer.h"
-#include "AliQvectorCorrectionND.h"
+#include "AliQvectorAlignmentND.h"
 
-void AliQvectorCorrectionND::Configure(std::string name,
+void AliQvectorAlignmentND::Configure(std::string name,
                                        const std::vector<TAxis*> &axes,
                                        const std::vector<std::string> &rbr_axes,
-                                       bool equalize,
                                        int min_entries) {
   fName = name;
-  fEqualization = equalize;
   fRunByRunAxes = rbr_axes;
   fAxes.SetOwner(true);
   for (auto &axis : axes) fAxes.Add(axis);
 }
 
-void AliQvectorCorrectionND::Make(TFile *file, int run_number, TList *corrections, TList *qa) {
+void AliQvectorAlignmentND::Make(TFile *file, int run_number, TList *corrections, TList *qa) {
   OpenAxes(file, run_number);
   AddHistogramsToList(corrections);
   AddQAToList(qa);
   OpenCorrection(file, run_number);
 }
 
-AliQvector AliQvectorCorrectionND::Apply(const AliQvector q_vector, double *variables) {
-  AliQvector rec = q_vector;
-  fSumXout->Fill(variables, q_vector.x);
-  fSumYout->Fill(variables, q_vector.y);
+AliQvector AliQvectorAlignmentND::Apply(const AliQvector q, const AliQvector qa, double *variables) {
+  AliQvector aligned = q;
+  if (!(qa.sum > 0. && q.sum > 0.)) return aligned;
+  fSumXXout->Fill(variables, q.x*qa.x/qa.sum);
+  fSumYYout->Fill(variables, q.y*qa.y/qa.sum);
+  fSumXYout->Fill(variables, q.x*qa.y/qa.sum);
+  fSumYXout->Fill(variables, q.y*qa.x/qa.sum);
   fSumWout->Fill(variables, 1.0);
-  if (fSumWin && fSumXin && fSumYin) {
+  if (fSumWin && fSumXXin && fSumYYin && fSumXYin && fSumYXin) {
     std::vector<Int_t> bins(fSumWin->GetNdimensions());
     for (auto i = 0; i < fSumWin->GetNdimensions(); ++i) {
       bins[i] = fSumWin->GetAxis(i)->FindBin(variables[i]);
     }
     auto bin  = fSumWin->GetBin(bins.data());
     auto n    = fSumWin->GetBinContent(bin);
-    auto xsum = fSumXin->GetBinContent(bin);
-    auto ysum = fSumYin->GetBinContent(bin);
-    if (n > fMinEntries) {
-      auto xmean = xsum / n;
-      auto ymean = ysum / n;
-      auto xwidth = 1.;
-      auto ywidth = 1.;
-      if (fEqualization) {
-        auto xerror = fSumXin->GetBinError2(bin);
-        auto yerror = fSumYin->GetBinError2(bin);
-        xwidth = sqrt(std::fabs(xerror/n - xmean*xmean));
-        ywidth = sqrt(std::fabs(yerror/n - ymean*ymean));
-      }
-      rec = q_vector.Recenter(xmean, ymean, xwidth, ywidth, fEqualization);
-      fSumXqa->Fill(variables, rec.x);
-      fSumYqa->Fill(variables, rec.y);
-      fSumWqa->Fill(variables, 1.0);
+    auto xx = fSumXXin->GetBinContent(bin) / n;
+    auto yy = fSumYYin->GetBinContent(bin) / n;
+    auto xy = fSumXYin->GetBinContent(bin) / n;
+    auto yx = fSumYXin->GetBinContent(bin) / n;
+    auto exy = fSumXYin->GetBinError(bin) / n;
+    auto eyx = fSumYXin->GetBinError(bin) / n;
+    auto nharmonic = 1.;
+    auto phi = -TMath::ATan2((xy-yx), (xx+yy))/nharmonic;
+    auto significance = sqrt((xy-yx)*(xy-yx)/(exy*exy+eyx*eyx));
+    if (n > fMinEntries && significance > 2.) {
+      aligned.x = std::cos(phi) * q.x;  
+      aligned.y = std::sin(phi) * q.y; 
+      fSumXXqa->Fill(variables, aligned.x*qa.x);
+      fSumYYqa->Fill(variables, aligned.y*qa.y);
+      fSumXYqa->Fill(variables, aligned.x*qa.y);
+      fSumYXqa->Fill(variables, aligned.y*qa.x);
+      fSumWqa->Fill(variables, aligned.sum * qa.sum);
     } else {
       fEntriesQA->Fill(variables);
     }
   }
-  return rec;
+  return aligned;
 }
 
 
-void AliQvectorCorrectionND::OpenAxes(TFile *file, int run_number) {
+void AliQvectorAlignmentND::OpenAxes(TFile *file, int run_number) {
   if (!file || file->IsZombie()) return;
   for (auto &name : fRunByRunAxes) {
     auto axis = dynamic_cast<TAxis*>(fAxes.FindObject(name.c_str()));
@@ -86,42 +87,52 @@ void AliQvectorCorrectionND::OpenAxes(TFile *file, int run_number) {
   }
 }
 
-void AliQvectorCorrectionND::OpenCorrection(TFile *file, int run_number) {
+void AliQvectorAlignmentND::OpenCorrection(TFile *file, int run_number) {
   if (!file || file->IsZombie()) return;
-  fSumXin.reset(ReadFromOADB<THnF>(file, fSumXout->GetName(), run_number));
-  fSumYin.reset(ReadFromOADB<THnF>(file, fSumYout->GetName(), run_number));
+  fSumXXin.reset(ReadFromOADB<THnF>(file, fSumXXout->GetName(), run_number));
+  fSumYYin.reset(ReadFromOADB<THnF>(file, fSumYYout->GetName(), run_number));
+  fSumYXin.reset(ReadFromOADB<THnF>(file, fSumYXout->GetName(), run_number));
+  fSumXYin.reset(ReadFromOADB<THnF>(file, fSumXYout->GetName(), run_number));
   fSumWin.reset(ReadFromOADB<THnF>(file, fSumWout->GetName(), run_number));
-  if (fSumXin && fSumYin && fSumWin) {
+  if (fSumXXin && fSumYYin && fSumYXin && fSumXYin && fSumWin) {
+    std::cout << fName << " ND align is applied" << std::endl;
     fIsApplied = true;
-    std::cout << fName << " ND recentering is applied" << std::endl;
   }
 }
 
-void AliQvectorCorrectionND::AddHistogramsToList(TList *list) {
+void AliQvectorAlignmentND::AddHistogramsToList(TList *list) {
   std::string axestitles;
   for (const auto &&obj : fAxes) axestitles += std::string(";") + obj->GetName();
-  ConfigureTHn(&fSumXout, fName+"_X", axestitles);
-  ConfigureTHn(&fSumYout, fName+"_Y", axestitles);
+  ConfigureTHn(&fSumXXout, fName+"_XX", axestitles);
+  ConfigureTHn(&fSumYYout, fName+"_YY", axestitles);
+  ConfigureTHn(&fSumYXout, fName+"_YX", axestitles);
+  ConfigureTHn(&fSumXYout, fName+"_XY", axestitles);
   ConfigureTHn(&fSumWout, fName+"_W", axestitles);
-  list->Add(fSumXout);
-  list->Add(fSumYout);
+  list->Add(fSumXXout);
+  list->Add(fSumYYout);
+  list->Add(fSumXYout);
+  list->Add(fSumYXout);
   list->Add(fSumWout);
 }
 
-void AliQvectorCorrectionND::AddQAToList(TList *list) {
+void AliQvectorAlignmentND::AddQAToList(TList *list) {
   std::string axestitles;
   for (const auto &&obj : fAxes) axestitles += std::string(";") + obj->GetName();
-  ConfigureTHn(&fSumXqa, fName+"_X_QA", axestitles);
-  ConfigureTHn(&fSumYqa, fName+"_Y_QA", axestitles);
+  ConfigureTHn(&fSumXXqa, fName+"_XX_QA", axestitles);
+  ConfigureTHn(&fSumYYqa, fName+"_YY_QA", axestitles);
+  ConfigureTHn(&fSumXYqa, fName+"_XY_QA", axestitles);
+  ConfigureTHn(&fSumYXqa, fName+"_XY_QA", axestitles);
   ConfigureTHn(&fSumWqa, fName+"_W_QA", axestitles);
   ConfigureTHn(&fEntriesQA, fName+"_Entries_QA", axestitles);
-  list->Add(fSumXqa);
-  list->Add(fSumYqa);
+  list->Add(fSumXXqa);
+  list->Add(fSumYYqa);
+  list->Add(fSumXYqa);
+  list->Add(fSumYXqa);
   list->Add(fSumWqa);
   list->Add(fEntriesQA);
 }
 
-void AliQvectorCorrectionND::ConfigureTHn(THnF **thn, 
+void AliQvectorAlignmentND::ConfigureTHn(THnF **thn, 
                                           std::string name, 
                                           std::string title) {
     std::vector<int> nbins;

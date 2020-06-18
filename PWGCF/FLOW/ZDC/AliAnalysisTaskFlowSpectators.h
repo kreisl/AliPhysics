@@ -1,5 +1,5 @@
-#ifndef ALIANALYSISTASKFLOWZ_H
-#define ALIANALYSISTASKFLOWZ_H
+#ifndef ALIANALYSISTASKFLOWSPECTATORS_H
+#define ALIANALYSISTASKFLOWSPECTATORS_H
 
 /* Copyright(c) 1998-2020, ALICE Experiment at CERN, All rights reserved. *
  * See cxx source for full Copyright notice                               */
@@ -12,26 +12,22 @@
 #include "AliAnalysisTaskSE.h"
 #include "AliEventCuts.h"
 #include "AliZDCgainEq.h"
-#include "AliZDCdirectedFlow.h"
 #include "AliZDCellipticFlow.h"
 #include "AliZDCcumulantFlow.h"
 #include "AliQvector.h"
 #include "AliQvectorMagnitude.h"
-#include "AliQvectorCorrection.h"
-#include "AliQvectorCorrectionKD.h"
 #include "AliQvectorCorrectionND.h"
 #include "AliQvectorAlignmentND.h"
 
-class AliAnalysisTaskFlowZ : public AliAnalysisTaskSE {
+class AliAnalysisTaskFlowSpectators : public AliAnalysisTaskSE {
  public:
-  AliAnalysisTaskFlowZ();
-  AliAnalysisTaskFlowZ(const char*);
-  virtual ~AliAnalysisTaskFlowZ();
+  AliAnalysisTaskFlowSpectators();
+  AliAnalysisTaskFlowSpectators(const char*);
+  virtual ~AliAnalysisTaskFlowSpectators();
   virtual void UserCreateOutputObjects();
   virtual void UserExec(Option_t*);
   virtual void NotifyRun();
   void SetCorrectionFile(std::string name) { fCorrectionFileName = name; }
-  void AddDirectedFlowAnalyses(const YAML::Node &node); 
   void AddCumulantFlowAnalyses(const YAML::Node &node); 
   void AddEllipticFlowAnalyses(const YAML::Node &node);
   void ConfigureBinning(int nbinsxy,
@@ -81,6 +77,76 @@ class AliAnalysisTaskFlowZ : public AliAnalysisTaskSE {
   Double_t fDelayedEtaMin;
   Double_t fDelayedEtaMax;
 
+  AliEventCuts fEventCuts; //< general event cuts
+  AliAnalysisUtils *fAnalysisUtils = nullptr; //< analysis utils
+  TList *fCorrelationList; //< output list correlations
+  TList *fCorrectionList;  //< output list corrections
+  TList *fQAList;          //< output list QA
+  std::vector<AliZDCellipticFlow> fEllipticFlowAnalyses; //< elliptic flow analysis with zdc
+  std::vector<AliZDCcumulantFlow> fCumulantFlowAnalyses; //< elliptic flow analysis with tpc cumulants
+
+
+  // Pileup cut using multiplicities of TPC only and global tracks
+  TH2D *fNtracksESDvsNclsITS = nullptr;
+  TH2D *fMultiplicityTPConlyVsGlobal = nullptr; // before cut
+  TH2D *fMultiplicityTPConlyVsGlobalCut = nullptr; // after cut
+  TH2D *fNSigmaTPConlyVsGlobal = nullptr; // nsigma distribution around mean
+  TGraph *fMultMean = nullptr; // linear fit to mean of tpc only tracks
+  TGraph *fMult3SigmaPlus = nullptr; // mean + 3sigma
+  TGraph *fMult3SigmaMinus = nullptr; // mean - 3 sigma
+  TH1D *fCentralityWeightInput = nullptr; // centrality weight after pileup cut
+
+  // Subsampling parameters
+  Int_t fNsamples = 10;                                        /// Number of samples
+  std::vector<Int_t> fSamples = std::vector<Int_t>(fNsamples); /// samples
+  std::mt19937 fRandomGenerator{std::random_device{}()};       /// Random number Gen
+  std::poisson_distribution<> fPoisson{1};                     /// distribution of events per sample.
+
+  // Non-uniform acceptance correction for ZDC
+  std::string fCorrectionFileName;   //< name of the correction file
+  TH1D *fCorrectionStep = nullptr;   //< correction step qa zdc
+  TH1D *fCorrectionStepEQ = nullptr; //< correction step qa gain equalized zdc
+
+  // Gain Equalization histograms
+  AliZDCgainEq fGainEqualizationZNA; //< gain equalization zdc
+  AliZDCgainEq fGainEqualizationZNC; //< gain equalization zdc
+
+  // Recentering correction 4D for VZERO
+  AliQvectorCorrectionND fRecenter4DV0A; //< ND recentering all in one step
+  AliQvectorCorrectionND fRecenter4DV0C; //< ND recentering all in one step
+
+  // Recentering correction 4D for neutron ZDC
+  AliQvectorCorrectionND fRecenter4DZNA; //< ND recentering all in one step
+  AliQvectorCorrectionND fRecenter4DZNC; //< ND recentering all in one step
+
+  // Recentering correction 4D for neutron ZDC
+  AliQvectorCorrectionND fRecenter4DAfterGainEqZNA; //< ND recentering all in one step
+  AliQvectorCorrectionND fRecenter4DAfterGainEqZNC; //< ND recentering all in one step
+
+  // Alignment correction
+  AliQvectorAlignmentND fAlignZNA; //< ND alignment all in one step
+  AliQvectorAlignmentND fAlignZNC; //< ND alignment all in one step
+
+
+  // Q-vector magnitude for ESE
+  AliQvectorMagnitude fQZNAmagnitude;
+  AliQvectorMagnitude fQZNCmagnitude;
+
+  // QA histograms
+  TH1D* fCentralityV0M = nullptr; //!<! centrality QA histogram
+  TH1D* fCentralityCL1 = nullptr; //!<! centrality QA histogram
+  TH1D* fPsiZA = nullptr; //!<! eventplane angle QA histogram
+  TH1D* fPsiZC = nullptr; //!<! eventplane angle QA histogram
+  TH1D* fPsiZAEQ = nullptr; //!<! eventplane angle QA histogram
+  TH1D* fPsiZCEQ = nullptr; //!<! eventplane angle QA histogram
+  TH1D* fPsiTPC1 = nullptr; //!<! eventplane angle QA histogram
+  TH1D* fPsiTPC2 = nullptr; //!<! eventplane angle QA histogram
+  TH1D* fVertexX = nullptr; //!<! primary vertex QA histogram
+  TH1D* fVertexY = nullptr; //!<! primary vertex QA histogram
+  TH1D* fVertexZ = nullptr;  //!<! primary vertex QA histogram
+  TH2D* fVertexXY = nullptr; //!<! primary vertex QA histogram
+  TH2D* fCentralityCL1vsV0M = nullptr; //!<! centrality correlations cl1 vs v0m
+
   // QA tree variables
   TTree   *fTree = nullptr;
   Double_t fBcentV0M = -1.;
@@ -126,92 +192,8 @@ class AliAnalysisTaskFlowZ : public AliAnalysisTaskSE {
   Double_t fByTPC96 = 0.;
   Double_t fBsTPC96 = 0.;
 
-  AliEventCuts fEventCuts; //< general event cuts
-  AliAnalysisUtils *fAnalysisUtils = nullptr; //< analysis utils
-  TList *fCorrelationList; //< output list correlations
-  TList *fCorrectionList;  //< output list corrections
-  TList *fQAList;          //< output list QA
-  std::vector<AliZDCdirectedFlow> fDirectedFlowAnalyses; //< directed flow analysis with zdc
-  std::vector<AliZDCellipticFlow> fEllipticFlowAnalyses; //< elliptic flow analysis with zdc
-  std::vector<AliZDCcumulantFlow> fCumulantFlowAnalyses; //< elliptic flow analysis with tpc cumulants
-
-
-  // Pileup cut using multiplicities of TPC only and global tracks
-  TH2D *fNtracksESDvsNclsITS = nullptr;
-  TH2D *fMultiplicityTPConlyVsGlobal = nullptr; // before cut
-  TH2D *fMultiplicityTPConlyVsGlobalCut = nullptr; // after cut
-  TH2D *fNSigmaTPConlyVsGlobal = nullptr; // nsigma distribution around mean
-  TGraph *fMultMean = nullptr; // linear fit to mean of tpc only tracks
-  TGraph *fMult3SigmaPlus = nullptr; // mean + 3sigma
-  TGraph *fMult3SigmaMinus = nullptr; // mean - 3 sigma
-  TH1D *fCentralityWeightInput = nullptr; // centrality weight after pileup cut
-
-
-  // Subsampling parameters
-  Int_t fNsamples = 10;                                  /// Number of samples
-  std::vector<Int_t> fSamples = std::vector<Int_t>(fNsamples); /// samples
-  std::mt19937 fRandomGenerator{std::random_device{}()}; /// Random number Gen
-  std::poisson_distribution<> fPoisson{1};               /// distribution of events per sample.
-
-  // Non-uniform acceptance correction for ZDC
-  std::string fCorrectionFileName;   //< name of the correction file
-  TH1D *fCorrectionStep = nullptr;   //< correction step qa zdc
-  TH1D *fCorrectionStepEQ = nullptr; //< correction step qa gain equalized zdc
-
-  // Gain Equalization histograms
-  AliZDCgainEq fGainEqZNA; //< gain equalization zdc
-  AliZDCgainEq fGainEqZNC; //< gain equalization zdc
-
-  // Recentering correction 4D
-  AliQvectorCorrectionND fCorrectV0Aall; //< ND recentering all in one step
-  AliQvectorCorrectionND fCorrectV0Call; //< ND recentering all in one step
-
-  // Recentering correction 4D
-  AliQvectorCorrectionND fCorrectZNAall; //< ND recentering all in one step
-  AliQvectorCorrectionND fCorrectZNCall; //< ND recentering all in one step
-  // Alignment correction
-  AliQvectorAlignmentND fAlignZNA; //< ND alignment all in one step
-  AliQvectorAlignmentND fAlignZNC; //< ND alignment all in one step
-
-  // Iterative recentering correction
-  AliQvectorCorrection1D fCorrectZNAEQcentStep1; //< recentering corrections gain equalized zdc
-  AliQvectorCorrection1D fCorrectZNCEQcentStep1; //< recentering corrections gain equalized zdc
-  AliQvectorCorrectionKD fCorrectZNAEQvXYZStep2; //< recentering corrections gain equalized zdc
-  AliQvectorCorrectionKD fCorrectZNCEQvXYZStep2; //< recentering corrections gain equalized zdc
-  AliQvectorCorrection1D fCorrectZNAEQcentStep3; //< recentering corrections gain equalized zdc
-  AliQvectorCorrection1D fCorrectZNCEQcentStep3; //< recentering corrections gain equalized zdc
-
-  // Interpolated iterative recentering correction
-  AliQvectorCorrection1DInterpolate fCorrectZNAcentInterStep1; //< recentering corrections zdc
-  AliQvectorCorrection1DInterpolate fCorrectZNCcentInterStep1; //< recentering corrections zdc
-  AliQvectorCorrection1D fCorrectZNAcentStep1; //< recentering corrections zdc
-  AliQvectorCorrection1D fCorrectZNCcentStep1; //< recentering corrections zdc
-  AliQvectorCorrectionKD fCorrectZNAvXYZStep2; //< recentering corrections zdc
-  AliQvectorCorrectionKD fCorrectZNCvXYZStep2; //< recentering corrections zdc
-  AliQvectorCorrection1D fCorrectZNAcentStep3; //< recentering corrections zdc
-  AliQvectorCorrection1D fCorrectZNCcentStep3; //< recentering corrections zdc
-
-  // Q-vector magnitude for ESE
-  AliQvectorMagnitude fQZNAmagnitude;
-  AliQvectorMagnitude fQZNCmagnitude;
-
-  // QA histograms
-  TH1D* fCentralityV0M = nullptr; //!<! centrality QA histogram
-  TH1D* fCentralityCL1 = nullptr; //!<! centrality QA histogram
-  TH1D* fPsiZA = nullptr; //!<! eventplane angle QA histogram
-  TH1D* fPsiZC = nullptr; //!<! eventplane angle QA histogram
-  TH1D* fPsiZAEQ = nullptr; //!<! eventplane angle QA histogram
-  TH1D* fPsiZCEQ = nullptr; //!<! eventplane angle QA histogram
-  TH1D* fPsiTPC1 = nullptr; //!<! eventplane angle QA histogram
-  TH1D* fPsiTPC2 = nullptr; //!<! eventplane angle QA histogram
-  TH1D* fVertexX = nullptr; //!<! primary vertex QA histogram
-  TH1D* fVertexY = nullptr; //!<! primary vertex QA histogram
-  TH1D* fVertexZ = nullptr;  //!<! primary vertex QA histogram
-  TH2D* fVertexXY = nullptr; //!<! primary vertex QA histogram
-  TH2D* fCentralityCL1vsV0M = nullptr; //!<! centrality correlations cl1 vs v0m
-
   /// \cond CLASSDEF
-  ClassDef(AliAnalysisTaskFlowZ, 5);
+  ClassDef(AliAnalysisTaskFlowSpectators, 2);
   /// \endcond
 };
 

@@ -8,9 +8,9 @@
 #include "TMath.h"
 
 struct AliQvector {
-  double x;
-  double y;
-  double sum;
+  double x=0.;
+  double y=0.;
+  double sum=0.;
 
   enum class WidthRescale {
     YES,
@@ -52,8 +52,12 @@ struct AliQvector {
 };
 
 struct AliZDCQvectors {
-  AliQvector za;
-  AliQvector zc;
+  AliQvector a;
+  AliQvector c;
+  void Normalize() {
+    a.Normalize();
+    c.Normalize();
+  }
 };
 
 #endif

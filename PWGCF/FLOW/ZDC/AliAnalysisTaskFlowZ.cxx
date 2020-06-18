@@ -27,6 +27,8 @@
 #include "AliOADBContainer.h"
 #include "AliZDCflowCuts.h"
 #include "AliAnalysisTaskFlowZ.h"
+#include "AliAnalysisUtils.h"
+#include "AliQvectors.h"
 
 AliAnalysisTaskFlowZ::AliAnalysisTaskFlowZ() : 
   AliAnalysisTaskSE() {}
@@ -44,6 +46,7 @@ AliAnalysisTaskFlowZ::~AliAnalysisTaskFlowZ() {
   delete fCorrectionList;
   delete fQAList;
   delete fTree;
+  delete fAnalysisUtils;
 }
 
 void AliAnalysisTaskFlowZ::UserCreateOutputObjects() {
@@ -53,6 +56,9 @@ void AliAnalysisTaskFlowZ::UserCreateOutputObjects() {
   fCorrectionList->SetOwner(true);
   fQAList = new TList();
   fQAList->SetOwner(true);
+
+  // Apply delayed configuration
+  ApplyConfiguration();
 
   fGainEqZNA.Configure("ZNA", 4, {4});
   fGainEqZNC.Configure("ZNC", 4, {4});
@@ -128,6 +134,15 @@ void AliAnalysisTaskFlowZ::UserCreateOutputObjects() {
   fQAList->Add(fVertexZ);
   fQAList->Add(fVertexXY);
 
+  fMultiplicityTPConlyVsGlobal = new TH2D("MultiplicityTPConlyvsGlobal",";global;tpc only",1500, 0., 3000., 2000, 0., 4000.);
+  fMultiplicityTPConlyVsGlobalCut = new TH2D("MultiplicityTPConlyvsGlobalCut",";global;tpc only",1500, 0., 3000., 2000, 0., 4000.);
+  fNSigmaTPConlyVsGlobal = new TH2D("fNSigmaTPConlyVsGlobal",";global;N sigma ;tpc only",1500, 0., 3000., 500, -10., 10.);
+  fNtracksESDvsNclsITS = new TH2D("NtracksESDvsNclsITS",";esd tracks;ITS clusters",1500, 0., 14000., 2000, 0., 26000.);
+  fQAList->Add(fMultiplicityTPConlyVsGlobal);
+  fQAList->Add(fMultiplicityTPConlyVsGlobalCut);
+  fQAList->Add(fNSigmaTPConlyVsGlobal);
+  fQAList->Add(fNtracksESDvsNclsITS);
+
   fPsiZA   = new TH1D("Psi_ZNA", ";#Psi_{ZNA};N", 50, 0., 2*TMath::Pi());
   fPsiZC   = new TH1D("Psi_ZNC", ";#Psi_{ZNC};N", 50, 0., 2*TMath::Pi());
   fPsiZAEQ = new TH1D("Psi_ZNA_EQ", ";#Psi_{ZNA};N", 50, 0., 2*TMath::Pi());
@@ -167,19 +182,33 @@ void AliAnalysisTaskFlowZ::UserCreateOutputObjects() {
   fTree->Branch("X_ZNC_all", &fBxZNCall);
   fTree->Branch("Y_ZNC_all", &fByZNCall);
   fTree->Branch("M_ZNC_all", &fBsZNCall);
-  fTree->Branch("X_ZNA_iter", &fBxZNAiter);
-  fTree->Branch("Y_ZNA_iter", &fByZNAiter);
-  fTree->Branch("M_ZNA_iter", &fBsZNAiter);
-  fTree->Branch("X_ZNC_iter", &fBxZNCiter);
-  fTree->Branch("Y_ZNC_iter", &fByZNCiter);
-  fTree->Branch("M_ZNC_iter", &fBsZNCiter);
+
+  fTree->Branch("X_TPC768_NUA", &fBxTPC768_NUA);
+  fTree->Branch("Y_TPC768_NUA", &fByTPC768_NUA);
+  fTree->Branch("X2_TPC768_NUA", &fBx2TPC768_NUA);
+  fTree->Branch("Y2_TPC768_NUA", &fBy2TPC768_NUA);
+  fTree->Branch("M_TPC768_NUA", &fBsTPC768_NUA);
+
   fTree->Branch("X_TPC768", &fBxTPC768);
   fTree->Branch("Y_TPC768", &fByTPC768);
   fTree->Branch("M_TPC768", &fBsTPC768);
+  fTree->Branch("X2_TPC768", &fBx2TPC768);
+  fTree->Branch("Y2_TPC768", &fBy2TPC768);
+
+  fBnClsITS.resize(6);
+  fTree->Branch("NclsITS", &fBnClsITS);
+  fTree->Branch("NtracksESD", &fBnTracksESD);
+
   fTree->Branch("X_TPC96", &fBxTPC96);
   fTree->Branch("Y_TPC96", &fByTPC96);
   fTree->Branch("M_TPC96", &fBsTPC96);
-  //
+
+  fTree->Branch("MultFB128", &fBmultFB128);
+  fTree->Branch("MultFB768", &fBmultFB768);
+  
+  fAnalysisUtils = new AliAnalysisUtils();
+  fAnalysisUtils->SetUseMVPlpSelection(true);
+  fAnalysisUtils->SetUseOutOfBunchPileUp(true);
   
   fEventCuts.SetupRun1PbPb();
 
@@ -221,9 +250,35 @@ void AliAnalysisTaskFlowZ::NotifyRun() {
     fQZNAmagnitude.ReadFile(file);
     fQZNCmagnitude.ReadFile(file);
 
+    auto graph3sigmap = dynamic_cast<TGraph*>(
+        file->Get("TPConlyVsGlobalMeanPlusSigma3"));
+    auto graph3sigmam = dynamic_cast<TGraph*>(
+        file->Get("TPConlyVsGlobalMeanMinusSigma3"));
+    auto graphmean = dynamic_cast<TGraph*>(
+        file->Get("TPConlyVsGlobalMean"));
+    if (graph3sigmap && graph3sigmam && graphmean) {
+      std::cout << "multiplicity cut found" << std::endl;
+      fMult3SigmaPlus = graph3sigmap;
+      fMult3SigmaMinus = graph3sigmam;
+      fMultMean = graphmean;
+    }
+
+    fCentralityWeightInput = dynamic_cast<TH1D*>(file->Get("CentralityWeights"));
+    if (fCentralityWeightInput) {
+      fCentralityWeightInput->SetDirectory(0);
+      std::cout << "using Centrality weights" << std::endl;
+    }
+
     fGainEqZNA.OpenCorrection(file,fCurrentRunNumber);
     fGainEqZNC.OpenCorrection(file,fCurrentRunNumber);
     // nd
+    fAlignZNA.Make(file, fCurrentRunNumber, fCorrectionList, fQAList);
+    fAlignZNC.Make(file, fCurrentRunNumber, fCorrectionList, fQAList);
+
+    std::cout << "test" <<std::endl;
+    fCorrectV0Aall.Make(file, fCurrentRunNumber, fCorrectionList, fQAList);
+    fCorrectV0Call.Make(file, fCurrentRunNumber, fCorrectionList, fQAList);
+
     fCorrectZNAall.Make(file, fCurrentRunNumber, fCorrectionList, fQAList);
     fCorrectZNCall.Make(file, fCurrentRunNumber, fCorrectionList, fQAList);
     // interpolate
@@ -260,6 +315,7 @@ void AliAnalysisTaskFlowZ::NotifyRun() {
     // cumulants
     for (auto &analysis : fCumulantFlowAnalyses) {
       analysis.OpenCorrection(file, fCurrentRunNumber);
+      analysis.OpenPtEfficiencies(file);
     }
   }
   file->Close();
@@ -272,12 +328,16 @@ void AliAnalysisTaskFlowZ::NotifyRun() {
 }
 
 void AliAnalysisTaskFlowZ::UserExec(Option_t*) {
+  ResetTreeValues();
   auto event = dynamic_cast<AliAODEvent*>(InputEvent());
   if (!event) return;
   auto eventhandler = dynamic_cast<AliInputEventHandler*>(AliAnalysisManager::GetAnalysisManager()->GetInputEventHandler());
   if (!eventhandler->IsEventSelected()) return;
   if (!fEventCuts.AcceptEvent(event))   return;
-  AnalyzeEvent(event);
+  if (fAnalysisUtils->IsPileUpEvent(event)) return;
+  if (MultiplicityCut(event)) {
+    AnalyzeEvent(event);
+  }
   fTree->Fill();
   PostData(1, fCorrelationList);
   PostData(2, fCorrectionList);
@@ -285,8 +345,69 @@ void AliAnalysisTaskFlowZ::UserExec(Option_t*) {
   PostData(4, fTree);
 }
 
+bool AliAnalysisTaskFlowZ::MultiplicityCut(AliAODEvent* event) {
+  bool pass = true;
+  double ntracks_tpc_only = 0.;
+  double ntracks_global = 0.;
+  AliQvector qtpc768 = {0., 0., 0.};
+  AliQvector q2tpc768 = {0., 0., 0.};
+  AliQvector qtpc96 = {0., 0., 0.};
+  // Track QA Qvector in tree
+  const unsigned int ntracks = event->GetNumberOfTracks();
+  for (unsigned int i = 0; i < ntracks; ++i) {
+    auto track = static_cast<AliAODTrack*>(event->GetTrack(i));
+    if (!track) continue;
+    if (track->TestFilterBit(128)) ++ntracks_tpc_only;
+    if (track->TestFilterBit(768)) ++ntracks_global;
+    const auto tpc_ncls = track->GetTPCncls();
+    const auto tpc_chi2_cls = track->GetTPCchi2perCluster();
+    if (track->Pt() > 0.2 &&
+        track->Pt() < 30. &&
+        std::fabs(track->Eta()) < 0.8 &&
+        tpc_ncls > 70 &&
+        tpc_chi2_cls > 0.1 &&
+        tpc_chi2_cls < 4) {
+      if (track->TestFilterBit(768)) {
+          qtpc768.Update(2.*track->Phi(), 1.0);
+          q2tpc768.Update(4.*track->Phi(), 1.0);
+      }
+      if (track->TestFilterBit(96)) {
+        qtpc96.Update(2.*track->Phi(), 1.0);
+      }
+    }
+  }
+  fBxTPC768 = qtpc768.x;
+  fByTPC768 = qtpc768.y;
+  fBsTPC768 = qtpc768.sum;
+  fBx2TPC768 = q2tpc768.x;
+  fBy2TPC768 = q2tpc768.y;
+  fBxTPC96 = qtpc96.x;
+  fByTPC96 = qtpc96.y;
+  fBsTPC96 = qtpc96.sum;
+  fBmultFB128 = ntracks_tpc_only;
+  fBmultFB768 = ntracks_global;
+  fBnTracksESD = event->GetNumberOfESDTracks();
+  for (int i = 0; i < 6; ++i) {
+    fBnClsITS[i] =  event->GetNumberOfITSClusters(i);
+  }
+  const auto nclsits = fBnClsITS[2]+fBnClsITS[3]+fBnClsITS[4]+fBnClsITS[5];
+  fNtracksESDvsNclsITS->Fill(fBnTracksESD, nclsits);
+  fMultiplicityTPConlyVsGlobal->Fill(ntracks_global, ntracks_tpc_only);
+  if (fMultMean && fMult3SigmaPlus && fMult3SigmaMinus) {
+    auto max = fMult3SigmaPlus->Eval(ntracks_global);
+    auto min = fMult3SigmaMinus->Eval(ntracks_global);
+    if (ntracks_tpc_only < min || ntracks_tpc_only > max) pass = false;
+    auto mean = fMultMean->Eval(ntracks_global);
+    auto nsigma = 3.*(ntracks_tpc_only - mean)/(max-mean); 
+    fNSigmaTPConlyVsGlobal->Fill(ntracks_global, nsigma);
+  }
+  if (pass) {
+    fMultiplicityTPConlyVsGlobalCut->Fill(ntracks_global, ntracks_tpc_only);
+  }
+  return pass;
+}
+
 void AliAnalysisTaskFlowZ::AnalyzeEvent(AliAODEvent* event) {
-  ResetTreeValues();
   //
   float cent_v0m = -1.;
   float cent_cl1 = -1.;
@@ -324,9 +445,24 @@ void AliAnalysisTaskFlowZ::AnalyzeEvent(AliAODEvent* event) {
 
   std::vector<double> variables = {cent_v0m, vtxx, vtxy, vtxz};
 
-  for (auto &analysis : fDirectedFlowAnalyses) analysis.FindCentralityBin(event, cent_v0m, fSamples);
-  for (auto &analysis : fEllipticFlowAnalyses) analysis.FindCentralityBin(event, cent_v0m, fSamples);
-  for (auto &analysis : fCumulantFlowAnalyses) analysis.FindCentralityBin(event, cent_v0m, fSamples);
+  double centrality_weight = 1.;
+  if (fCentralityWeightInput) {
+    centrality_weight = fCentralityWeightInput->GetBinContent(
+                          fCentralityWeightInput->FindBin(cent_v0m));
+  }
+
+  for (auto &analysis : fDirectedFlowAnalyses) {
+    analysis.FindCentralityBin(event, cent_v0m, fSamples);
+    analysis.SetCentralityWeight(centrality_weight);
+  }
+  for (auto &analysis : fEllipticFlowAnalyses) {
+    analysis.FindCentralityBin(event, cent_v0m, fSamples);
+    analysis.SetCentralityWeight(centrality_weight);
+  }
+  for (auto &analysis : fCumulantFlowAnalyses) {
+    analysis.FindCentralityBin(event, cent_v0m, fSamples);
+    analysis.SetCentralityWeight(centrality_weight);
+  }
 
   // Build Q-vector of ZNA and ZNC
   const auto zdc = event->GetZDCData();
@@ -338,6 +474,7 @@ void AliAnalysisTaskFlowZ::AnalyzeEvent(AliAODEvent* event) {
   AliQvector qzc_eq = {0., 0., 0.};
   AliQvector qza_pl = {0., 0., 0.};
   AliQvector qzc_pl = {0., 0., 0.};
+
   qza_eq = fGainEqZNA.ApplyGainEq(tower_energy_a + 1, phizna.data() + 1);
   qzc_eq = fGainEqZNC.ApplyGainEq(tower_energy_c + 1, phiznc.data() + 1);
   const auto min_energy = 1e-6;
@@ -352,98 +489,162 @@ void AliAnalysisTaskFlowZ::AnalyzeEvent(AliAODEvent* event) {
   qza_pl.Normalize();
   qzc_pl.Normalize();
 
-  std::map<std::string, AliZDCQvectors> qvectors;
+  std::map<std::string, AliZDCQvectors> qvectors_zdc;
   // Correction in iterations with gain equalization
   AliZDCQvectors q_eq_c;
   if (fGainEqZNA.IsApplied() && fGainEqZNC.IsApplied()) {
-    q_eq_c.za = fCorrectZNAEQcentStep1.Correct(qza_eq, cent_v0m);
-    q_eq_c.zc = fCorrectZNCEQcentStep1.Correct(qzc_eq, cent_v0m);
+    q_eq_c.a = fCorrectZNAEQcentStep1.Correct(qza_eq, cent_v0m);
+    q_eq_c.c = fCorrectZNCEQcentStep1.Correct(qzc_eq, cent_v0m);
     if (fCorrectZNAEQcentStep1.IsApplied() && fCorrectZNCEQcentStep1.IsApplied()) {
-      qvectors.emplace("1st iteration gain equalization", q_eq_c);
-      q_eq_c.za = fCorrectZNAEQvXYZStep2.Correct(q_eq_c.za, vvtx);
-      q_eq_c.zc = fCorrectZNCEQvXYZStep2.Correct(q_eq_c.zc, vvtx);
+      qvectors_zdc.emplace("1st iteration gain equalization", q_eq_c);
+      q_eq_c.a = fCorrectZNAEQvXYZStep2.Correct(q_eq_c.a, vvtx);
+      q_eq_c.c = fCorrectZNCEQvXYZStep2.Correct(q_eq_c.c, vvtx);
     }
     if (fCorrectZNAEQvXYZStep2.IsApplied() && fCorrectZNCEQvXYZStep2.IsApplied()) {
-      qvectors.emplace("2nd iteration gain equalization", q_eq_c);
-      q_eq_c.za = fCorrectZNAEQcentStep3.Correct(q_eq_c.za, cent_v0m);
-      q_eq_c.zc = fCorrectZNCEQcentStep3.Correct(q_eq_c.zc, cent_v0m);
+      qvectors_zdc.emplace("2nd iteration gain equalization", q_eq_c);
+      q_eq_c.a = fCorrectZNAEQcentStep3.Correct(q_eq_c.a, cent_v0m);
+      q_eq_c.c = fCorrectZNCEQcentStep3.Correct(q_eq_c.c, cent_v0m);
     }
     if (fCorrectZNAEQcentStep3.IsApplied() && fCorrectZNCEQcentStep3.IsApplied()) {
-      qvectors.emplace("3rd iteration gain equalization", q_eq_c);
+      qvectors_zdc.emplace("3rd iteration gain equalization", q_eq_c);
     }
   }
   // Correction with interpolation
   AliZDCQvectors q_it_c;
-  q_it_c.za = fCorrectZNAcentInterStep1.Correct(qza_pl, cent_v0m);
-  q_it_c.zc = fCorrectZNCcentInterStep1.Correct(qzc_pl, cent_v0m);
-  qvectors.emplace("interpolated", q_it_c);
+  q_it_c.a = fCorrectZNAcentInterStep1.Correct(qza_pl, cent_v0m);
+  q_it_c.c = fCorrectZNCcentInterStep1.Correct(qzc_pl, cent_v0m);
+  qvectors_zdc.emplace("interpolated", q_it_c);
 
   // Correction in iterations
   AliZDCQvectors q_pl_c;
-  q_pl_c.za = fCorrectZNAcentStep1.Correct(qza_pl, cent_v0m);
-  q_pl_c.zc = fCorrectZNCcentStep1.Correct(qzc_pl, cent_v0m);
+  q_pl_c.a = fCorrectZNAcentStep1.Correct(qza_pl, cent_v0m);
+  q_pl_c.c = fCorrectZNCcentStep1.Correct(qzc_pl, cent_v0m);
   if (fCorrectZNAcentStep1.IsApplied() && fCorrectZNCcentStep1.IsApplied()) {
-    qvectors.emplace("1st iteration", q_pl_c);
-    q_pl_c.za = fCorrectZNAvXYZStep2.Correct(q_pl_c.za, vvtx);
-    q_pl_c.zc = fCorrectZNCvXYZStep2.Correct(q_pl_c.zc, vvtx);
+    qvectors_zdc.emplace("1st iteration", q_pl_c);
+    q_pl_c.a = fCorrectZNAvXYZStep2.Correct(q_pl_c.a, vvtx);
+    q_pl_c.c = fCorrectZNCvXYZStep2.Correct(q_pl_c.c, vvtx);
   }
   if (fCorrectZNAvXYZStep2.IsApplied() && fCorrectZNCvXYZStep2.IsApplied()) {
-    qvectors.emplace("2nd iteration", q_pl_c);
-    q_pl_c.za = fCorrectZNAcentStep3.Correct(q_pl_c.za, cent_v0m);
-    q_pl_c.zc = fCorrectZNCcentStep3.Correct(q_pl_c.zc, cent_v0m);
+    qvectors_zdc.emplace("2nd iteration", q_pl_c);
+    q_pl_c.a = fCorrectZNAcentStep3.Correct(q_pl_c.a, cent_v0m);
+    q_pl_c.c = fCorrectZNCcentStep3.Correct(q_pl_c.c, cent_v0m);
   }
   if (fCorrectZNAcentStep3.IsApplied() && fCorrectZNCcentStep3.IsApplied()) {
-    qvectors.emplace("3rd iteration", q_pl_c);
+    qvectors_zdc.emplace("3rd iteration", q_pl_c);
   }
 
   // Simultaneous ND correction  
   AliZDCQvectors q_all_c;
-  q_all_c.za = fCorrectZNAall.Apply(qza_pl, variables.data());
-  q_all_c.zc = fCorrectZNCall.Apply(qzc_pl, variables.data());
-  qvectors.emplace("nd", q_all_c);
+  q_all_c.a = fCorrectZNAall.Apply(qza_pl, variables.data());
+  q_all_c.c = fCorrectZNCall.Apply(qzc_pl, variables.data());
+  qvectors_zdc.emplace("nd", q_all_c);
 
-  fQZNAmagnitude.Fill(q_all_c.za, cent_v0m);
-  fQZNCmagnitude.Fill(q_all_c.zc, cent_v0m);
-
-  auto qpercentile_zna = fQZNAmagnitude.GetPercentile(q_all_c.za, cent_v0m);
-  auto qpercentile_znc = fQZNCmagnitude.GetPercentile(q_all_c.zc, cent_v0m);
-
-  for (auto &analysis : fCumulantFlowAnalyses) {
-    analysis.FillESE(qpercentile_zna, qpercentile_znc);
+  //Fill V0
+  AliQvector qva_pl = {0., 0., 0.};
+  AliQvector qvc_pl = {0., 0., 0.};
+  const double kPiDiv8 = 0.39269908;
+  const std::array<double, 8> phiv0 = {1*kPiDiv8, 3*kPiDiv8,   5*kPiDiv8,  7*kPiDiv8,
+                                       9*kPiDiv8, 11*kPiDiv8, 13*kPiDiv8, 15*kPiDiv8};
+  auto vzero = event->GetVZEROData();
+  double vzerothreshold = 1e-3;
+  for(unsigned int ich=0; ich<32; ich++){
+    double weight = vzero->GetMultiplicityV0A(ich);
+    if (weight > vzerothreshold) qva_pl.Update(2.*phiv0[ich%8], weight);
   }
-  
-
-
-  // ZDC event correlations
-  for (auto &analysis : fDirectedFlowAnalyses) analysis.SetQvectors(qvectors);
-  for (auto &analysis : fEllipticFlowAnalyses) analysis.SetQvectors(qvectors);
-  for (auto &analysis : fDirectedFlowAnalyses) analysis.FillPerEventCorrelations();
-  for (auto &analysis : fEllipticFlowAnalyses) analysis.FillPerEventCorrelations();
+  for(unsigned int ich=0; ich<32; ich++){
+    double weight = vzero->GetMultiplicityV0C(ich);
+    if (weight > vzerothreshold) qvc_pl.Update(2.*phiv0[ich%8], weight);
+  }
+  if (qva_pl.sum < min_sum || qvc_pl.sum < min_sum) return;
+  qva_pl.Normalize();
+  qvc_pl.Normalize();
+  std::map<std::string, AliZDCQvectors> qvectors_vzero;
+  AliZDCQvectors q_vzero_plain;
+  q_vzero_plain.a = qva_pl;
+  q_vzero_plain.c = qvc_pl;
+  qvectors_vzero.emplace("plain", q_vzero_plain);
+  // Simultaneous ND correction  
+  AliZDCQvectors q_vzero_all_c;
+  q_vzero_all_c.a = fCorrectV0Aall.Apply(qva_pl, variables.data());
+  q_vzero_all_c.c = fCorrectV0Call.Apply(qvc_pl, variables.data());
+  qvectors_vzero.emplace("nd", q_vzero_all_c);
 
   // Track loop 
-  AliQvector qtpc768 = {0., 0., 0.};
-  AliQvector qtpc96 = {0., 0., 0.};
+  AliZDCflowCuts cut;
+  cut.CheckEventCuts(event);
   const unsigned int ntracks = event->GetNumberOfTracks();
   for (unsigned int i = 0; i < ntracks; ++i) {
     auto track = static_cast<AliAODTrack*>(event->GetTrack(i));
     if (!track) continue;
     for (auto &analysis : fDirectedFlowAnalyses) analysis.FillPerTrackCorrelations(track);
-    for (auto &analysis : fEllipticFlowAnalyses) analysis.FillPerTrackCorrelations(track);
     for (auto &analysis : fCumulantFlowAnalyses) analysis.FillPerTrackCorrelations(track);
-    if (track->Pt() > 0.15 && std::fabs(track->Eta()) < 0.8) {
-      if (track->TestFilterBit(768)) {
-        qtpc768.Update(2.*track->Phi(), 1.0);
-      }
-      if (track->TestFilterBit(96)) {
-        qtpc96.Update(2.*track->Phi(), 1.0);
-      }
+  }
+
+  std::map<std::string, Qv<4,4>> qtpc;
+  std::map<std::string, std::vector<Qv<4,4>>> qtpcpt;
+  std::map<std::string, Qv<4,4>> qtpcp;
+  std::map<std::string, Qv<4,4>> qtpcn;
+  for (auto &analysis : fCumulantFlowAnalyses) {
+    qtpcpt.emplace(analysis.Name(), analysis.GetQTPCpt());
+    qtpc.emplace(analysis.Name(), analysis.GetQTPC());
+    qtpcp.emplace(analysis.Name(), analysis.GetQTPCEtaPos());
+    qtpcn.emplace(analysis.Name(), analysis.GetQTPCEtaNeg());
+  }
+  //ZDC alignment
+  AliQvector q_tpc = {qtpc["default"](1,1).real(), 
+                      qtpc["default"](1,1).imag(),
+                      qtpc["default"](0,1).real()};
+  AliZDCQvectors q_align_c;
+  q_align_c.a = fAlignZNA.Apply(q_all_c.a, q_tpc, variables.data());
+  q_align_c.c = fAlignZNC.Apply(q_all_c.c, q_tpc, variables.data());
+  qvectors_zdc.emplace("aligned", q_align_c);
+
+  //ZNA magnitude
+  fQZNAmagnitude.Fill(q_all_c.a, cent_v0m);
+  fQZNCmagnitude.Fill(q_all_c.c, cent_v0m);
+
+  auto qpercentile_zna = fQZNAmagnitude.GetPercentile(q_all_c.a, cent_v0m);
+  auto qpercentile_znc = fQZNCmagnitude.GetPercentile(q_all_c.c, cent_v0m);
+
+  for (auto &analysis : fCumulantFlowAnalyses) {
+    analysis.FillESE(qpercentile_zna, qpercentile_znc);
+  }
+
+  // ZDC event correlations
+  for (auto &analysis : fDirectedFlowAnalyses) analysis.SetQvectorsZDC(qvectors_zdc);
+  for (auto &analysis : fEllipticFlowAnalyses) analysis.SetQvectorsZDC(qvectors_zdc);
+  for (auto &analysis : fEllipticFlowAnalyses) analysis.SetQvectorsV0(qvectors_vzero);
+  for (auto &analysis : fDirectedFlowAnalyses) analysis.FillPerEventCorrelations();
+
+
+  //set q vector of ellipticflowanalysis
+  for (auto &analysis : fEllipticFlowAnalyses) {
+    if (qtpc.find(analysis.Name()) != qtpc.end()) {
+      analysis.CalculateCorrelations(qtpc[analysis.Name()],
+                                     qtpcpt[analysis.Name()],
+                                     qtpcp[analysis.Name()],
+                                     qtpcn[analysis.Name()]);
+    } else {
+      analysis.CalculateCorrelations(qtpc["default"],
+                                     qtpcpt["default"],
+                                     qtpcp["default"],
+                                     qtpcn["default"]);
     }
   }
-  // Calculate cumulants
-  for (auto &analysis : fCumulantFlowAnalyses) analysis.CalculateCumulants();
 
+  // Calculate cumulants
+  for (auto &analysis : fCumulantFlowAnalyses) {
+    analysis.CalculateCumulants();
+  }
 
   // QA tree variables
+  
+  fBxTPC768_NUA  = qtpc["default"](2,1).real();
+  fByTPC768_NUA  = qtpc["default"](2,1).imag();
+  fBx2TPC768_NUA = qtpc["default"](4,1).real();
+  fBy2TPC768_NUA = qtpc["default"](4,1).imag();
+  fBsTPC768_NUA  = qtpc["default"](0,1).real();
+  
   fBxZNA = qza_pl.x;
   fByZNA = qza_pl.y;
   fBsZNA = qza_pl.sum;
@@ -452,36 +653,18 @@ void AliAnalysisTaskFlowZ::AnalyzeEvent(AliAODEvent* event) {
   fByZNC = qzc_pl.y;
   fBsZNC = qzc_pl.sum;
 
-  fBxZNAiter = q_pl_c.za.x;
-  fByZNAiter = q_pl_c.za.y;
-  fBsZNAiter = q_pl_c.za.sum;
+  fBxZNAall = q_all_c.a.x;
+  fByZNAall = q_all_c.a.y;
+  fBsZNAall = q_all_c.a.sum;
 
-  fBxZNCiter = q_pl_c.zc.x;
-  fByZNCiter = q_pl_c.zc.y;
-  fBsZNCiter = q_pl_c.zc.sum;
+  fBxZNCall = q_all_c.c.x;
+  fByZNCall = q_all_c.c.y;
+  fBsZNCall = q_all_c.c.sum;
 
-  fBxZNAall = q_all_c.za.x;
-  fByZNAall = q_all_c.za.y;
-  fBsZNAall = q_all_c.za.sum;
-
-  fBxZNCall = q_all_c.zc.x;
-  fByZNCall = q_all_c.zc.y;
-  fBsZNCall = q_all_c.zc.sum;
-
-  qtpc768.Normalize();
-  fBxTPC768 = qtpc768.x;
-  fByTPC768 = qtpc768.y;
-  fBsTPC768 = qtpc768.sum;
-
-  qtpc96.Normalize();
-  fBxTPC96 = qtpc96.x;
-  fByTPC96 = qtpc96.y;
-  fBsTPC96 = qtpc96.sum;
-
-  fPsiZA->Fill(q_pl_c.za.Psi());
-  fPsiZC->Fill(q_pl_c.zc.Psi());
-  fPsiZAEQ->Fill(q_eq_c.za.Psi());
-  fPsiZCEQ->Fill(q_eq_c.zc.Psi());
+  fPsiZA->Fill(q_pl_c.a.Psi());
+  fPsiZC->Fill(q_pl_c.c.Psi());
+  fPsiZAEQ->Fill(q_eq_c.a.Psi());
+  fPsiZCEQ->Fill(q_eq_c.c.Psi());
 }
 
 void AliAnalysisTaskFlowZ::AddDirectedFlowAnalyses(const YAML::Node &node) {
@@ -508,6 +691,18 @@ void AliAnalysisTaskFlowZ::AddEllipticFlowAnalyses(const YAML::Node &node) {
   }
 }
 
+void AliAnalysisTaskFlowZ::ApplyConfiguration() {
+  ConfigureCorrectionBinning(fDelayedNbinsXY, fDelayedNbinsZ, fDelayedEqualize);
+  ConfigureCumulantAnalysis(fDelayedEtaGap, 
+                            fDelayedPtBins,
+                            fDelayedVtxZBins,
+                            fDelayedNphiBins,
+                            fDelayedNetaBins,
+                            fDelayedEtaMin,
+                            fDelayedEtaMax);
+  ConfigureEllipticAnalysis(fDelayedPtBins);
+}
+
 void AliAnalysisTaskFlowZ::ConfigureEllipticAnalysis(const std::vector<double> &pt_bins) {
   for (auto &analysis : fEllipticFlowAnalyses) {
     analysis.SetPtBins(pt_bins);
@@ -530,18 +725,26 @@ void AliAnalysisTaskFlowZ::ConfigureCumulantAnalysis(double eta_gap,
 void AliAnalysisTaskFlowZ::ConfigureCorrectionBinning(int nbinsxy, int nbinsz, bool equalize) {
   // ND correction
   std::vector<TAxis*> axes;
-  auto make_axis = [&axes](std::string name, int n, double lo, double hi) {
+  auto make_axis = [](std::vector<TAxis*> &axes, std::string name, int n, double lo, double hi) {
     auto axis = new TAxis(n, lo, hi);
     axis->SetName(name.c_str());
     axes.push_back(axis);
   };
-  make_axis("centV0M", 100, 0., 100.);
-  make_axis("VtxX"   ,   3, 0., 100.); // binning configured run by run.
-  make_axis("VtxY"   ,   3, 0., 100.); // binning configured run by run.
-  make_axis("VtxZ"   ,   3, 0., 100.); // binning configured run by run.
+  make_axis(axes,"centV0M", 100, 0., 100.);
+  make_axis(axes,"VtxX"   ,   3, 0., 100.); // binning configured run by run.
+  make_axis(axes,"VtxY"   ,   3, 0., 100.); // binning configured run by run.
+  make_axis(axes,"VtxZ"   ,   3, 0., 100.); // binning configured run by run.
   std::vector<std::string> rbrvars{"VtxX", "VtxY", "VtxZ"};
   fCorrectZNAall.Configure("ZNA_all", axes, rbrvars, equalize, 5);
   fCorrectZNCall.Configure("ZNC_all", axes, rbrvars, equalize, 5);
+
+  fCorrectV0Aall.Configure("V0A_all", axes, rbrvars, equalize, 5);
+  fCorrectV0Call.Configure("V0C_all", axes, rbrvars, equalize, 5);
+
+  std::vector<TAxis*> axes_align;
+  make_axis(axes_align,"centV0M",10,0.,100.);
+  fAlignZNA.Configure("ZNA_Align_all", axes_align, {}, 5);
+  fAlignZNC.Configure("ZNC_Align_all", axes_align, {}, 5);
 
   std::vector<double_t> centrality_bins;
   for (double i = 0; i < 101; ++i) { centrality_bins.push_back(i); }
@@ -579,12 +782,6 @@ void AliAnalysisTaskFlowZ::ResetTreeValues() {
   fBxZNC = 0.;
   fByZNC = 0.;
   fBsZNC = 0.;
-  fBxZNAiter = 0.;
-  fByZNAiter = 0.;
-  fBsZNAiter = 0.;
-  fBxZNCiter = 0.;
-  fByZNCiter = 0.;
-  fBsZNCiter = 0.;
   fBxZNAall = 0.;
   fByZNAall = 0.;
   fBsZNAall = 0.;
@@ -593,8 +790,21 @@ void AliAnalysisTaskFlowZ::ResetTreeValues() {
   fBsZNCall = 0.;
   fBxTPC768 = 0.;
   fByTPC768 = 0.;
+  fBx2TPC768 = 0.;
+  fBy2TPC768 = 0.;
   fBsTPC768 = 0.;
   fBxTPC96 = 0.;
   fByTPC96 = 0.;
   fBsTPC96 = 0.;
+  fBmultFB128 = 0;
+  fBmultFB768 = 0;
+  fBnTracksESD = 0;
+
+  fBxTPC768_NUA  = 0.;
+  fByTPC768_NUA  = 0.;
+  fBx2TPC768_NUA = 0.;
+  fBy2TPC768_NUA = 0.;
+  fBsTPC768_NUA  = 0.;
+
+  for (auto &n : fBnClsITS) n = 0;
 }

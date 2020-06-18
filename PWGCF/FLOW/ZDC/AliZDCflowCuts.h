@@ -34,8 +34,6 @@ class AliZDCflowCuts : public TObject {
       ParseValue(ptMin, trackcuts, "pt_min");
       ParseValue(ptMax, trackcuts, "pt_max");
       ParseValue(etaMax, trackcuts, "eta_max");
-      ParseValue(DCAzMax, trackcuts, "dca_z_max");
-      ParseValue(DCAxyMax, trackcuts, "dca_xy_max");
       }
     }
     void Print();
@@ -48,10 +46,8 @@ class AliZDCflowCuts : public TObject {
     Double_t chi2MinCut =  0.1;
     Double_t chi2MaxCut =  4.;
     Double_t      ptMin =  0.2;
-    Double_t      ptMax = 50.;
+    Double_t      ptMax = 30.;
     Double_t     etaMax =  0.8;
-    Double_t    DCAzMax = -1.;
-    Double_t   DCAxyMax = -1.;
     TH2D *fHistPhi;
     TH2D *fHistEta;
     TH2D *fHistDCAxy;
@@ -62,6 +58,7 @@ class AliZDCflowCuts : public TObject {
     TH1D *fHistITSchi2;
     TH1D *fHistTPCchi2CvsGlo;
     TH1D *fHistTPCSharedClsF;
+    bool fQAhistograms = false;
   private:
     template<typename T>
     void ParseValue(T& value, YAML::Node node, std::string name) {
@@ -74,7 +71,7 @@ class AliZDCflowCuts : public TObject {
     AliAODEvent *fEvent;
 
   /// \cond CLASSDEF
-  ClassDef(AliZDCflowCuts, 2);
+  ClassDef(AliZDCflowCuts, 3);
   /// \endcond
 };
 
