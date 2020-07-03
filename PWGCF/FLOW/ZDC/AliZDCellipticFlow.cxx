@@ -135,7 +135,7 @@ void AliZDCellipticFlow::CalculateCorrelations(Qv<4,4> qtpc,
   auto qxetan = qtpcetan(2,1).real();
   auto qyetan = qtpcetan(2,1).imag();
   auto metan  = qtpcetan(0,1).real();
-  if (metap > 0. || metan > 0.) {
+  if (metap > 0. && metan > 0.) {
     qxetap /= metap;
     qyetap /= metap;
     qxetan /= metan;
