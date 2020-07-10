@@ -31,10 +31,7 @@ include_directories(${ROOT_INCLUDE_DIRS}
                     ${YAML_CPP_SOURCE_DIR}/include
                     )
 if (QnTools_FOUND)
-  include_directories(SYSTEM ${QnTools_INCLUDE_DIR})
-  link_directories(${QnTools_LIBS_DIR})
-  message("FindMe")
-  message(${QnTools_INCLUDE_DIR})
+  include_directories(${QnTools_INCLUDE_DIR})
   # Sources - alphabetical order
   set(SRCS
     AliAnalysisTaskFlowZDC.cxx

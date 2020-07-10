@@ -514,9 +514,13 @@ void AliAnalysisTaskFlowSpectators::AnalyzeEvent(AliAODEvent *event) {
   // ZDC alignment
   AliQvector q_tpc = {qtpc["default"](1, 1).real(), qtpc["default"](1, 1).imag(), qtpc["default"](0, 1).real()};
   AliZDCQvectors q_align_c;
-  q_align_c.a = fAlignZNA.Apply(q_zn_recentered.a, q_tpc, variables.data());
-  q_align_c.c = fAlignZNC.Apply(q_zn_recentered.c, q_tpc, variables.data());
-  qvectors_zdc.emplace("aligned", q_align_c);
+  if (fRecenter4DZNA.IsApplied() && fRecenter4DZNC.IsApplied()) {
+    q_align_c.a = fAlignZNA.Apply(q_zn_recentered.a, q_tpc, variables.data());
+    q_align_c.c = fAlignZNC.Apply(q_zn_recentered.c, q_tpc, variables.data());
+    if (fAlignZNA.IsApplied() && fAlignZNC.IsApplied()) {
+      qvectors_zdc.emplace("aligned", q_align_c);
+    }
+  }
   // ZDC Event-Shape-Engineering
   fQZNAmagnitude.Fill(q_zn_recentered.a, cent_v0m);
   fQZNCmagnitude.Fill(q_zn_recentered.c, cent_v0m);

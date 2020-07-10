@@ -23,6 +23,7 @@ class AliQvectorAlignmentND : public TObject {
                  int min_entries);
   void Make(TFile *file, int run_number, TList *corrections, TList *qa);
   AliQvector Apply(const AliQvector q, const AliQvector qa, double *variables);
+  bool IsApplied() const {return fIsApplied;}
 
  private:
   bool fIsApplied = false;
