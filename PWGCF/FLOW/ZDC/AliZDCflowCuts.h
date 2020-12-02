@@ -13,6 +13,9 @@ class AliAODEvent;
 class AliZDCflowCuts : public TObject {
   public: 
     virtual ~AliZDCflowCuts() = default;
+    double GetCentrality(std::vector<double> centralityEstimators) {
+      return centralityEstimators[centralityEstimator];
+    }
     void CheckEventCuts(AliAODEvent* event);
     bool CheckTrackCutsNoPtCut(AliAODTrack* track); 
     bool CheckTrackCutsPtCutOnly(AliAODTrack* track); 
@@ -23,6 +26,8 @@ class AliZDCflowCuts : public TObject {
       auto eventcuts = node["eventcuts"];
       if (eventcuts.IsDefined()) {
         ParseValue(vtxZcut, eventcuts, "vtx_z");
+        ParseValue(outlierCut, eventcuts, "mult_outlier_cut");
+        ParseValue(centralityEstimator, eventcuts, "centrality_estimator");
       }
       auto trackcuts = node["trackcuts"];
       if (trackcuts.IsDefined()) {
@@ -41,13 +46,15 @@ class AliZDCflowCuts : public TObject {
     Double_t vtxZcut    = 10.;
     // track cuts
     Int_t          sign =  0;
+    Int_t centralityEstimator = 0;
     UInt_t    filterBit =  768;
     Double_t    nClsCut =  70.;
     Double_t chi2MinCut =  0.1;
     Double_t chi2MaxCut =  4.;
     Double_t      ptMin =  0.2;
-    Double_t      ptMax = 30.;
+    Double_t      ptMax = 3.;
     Double_t     etaMax =  0.8;
+    Double_t outlierCut = 3.;
     TH2D *fHistPhi;
     TH2D *fHistEta;
     TH2D *fHistDCAxy;
@@ -58,7 +65,13 @@ class AliZDCflowCuts : public TObject {
     TH1D *fHistITSchi2;
     TH1D *fHistTPCchi2CvsGlo;
     TH1D *fHistTPCSharedClsF;
+    TH2D *fHistOutlierCut;
+    std::vector<TH2D*> fTPCMultVsITSCls_before;
+    std::vector<TH2D*> fTPCMultVsITSCls_after;
     bool fQAhistograms = false;
+    void CheckMultPileup(int ntracks, std::vector<int> ncls_its, std::vector<double> means,
+                         std::vector<double> sigmas, double cent);
+
   private:
     template<typename T>
     void ParseValue(T& value, YAML::Node node, std::string name) {

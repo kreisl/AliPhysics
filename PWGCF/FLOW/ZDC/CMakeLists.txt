@@ -34,21 +34,16 @@ if (QnTools_FOUND)
   include_directories(${QnTools_INCLUDE_DIR})
   # Sources - alphabetical order
   set(SRCS
-    AliAnalysisTaskFlowZDC.cxx
     AliQvector.cxx
-    AliQvectorCorrection.cxx
-    AliQvectorCorrectionKD.cxx
     AliQvectorCorrectionND.cxx
     AliQvectorAlignmentND.cxx
     AliZDCgainEq.cxx
     AliZDCflowCuts.cxx
-    AliZDCdirectedFlow.cxx
     AliZDCellipticFlow.cxx
     AliZDCcumulantFlow.cxx
-    AliAnalysisTaskFlowZ.cxx
-    AliAnalysisTaskFlowSpectators.cxx
     AliQvectorMagnitude.cxx
     AliZDCResultStorage.cxx
+    AliAnalysisTaskFlowSpectators.cxx
     )
   # Headers from sources
   string(REPLACE ".cxx" ".h" HDRS "${SRCS}")

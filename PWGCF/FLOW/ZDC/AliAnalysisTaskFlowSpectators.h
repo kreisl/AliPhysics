@@ -18,6 +18,7 @@
 #include "AliZDCellipticFlow.h"
 #include "AliZDCgainEq.h"
 #include "TTree.h"
+#include "TVector2.h"
 #include "yaml-cpp/yaml.h"
 
 class AliAnalysisTaskFlowSpectators : public AliAnalysisTaskSE {
@@ -81,6 +82,7 @@ class AliAnalysisTaskFlowSpectators : public AliAnalysisTaskSE {
     kPy,
     kPz,
     kEta,
+    kPtWeight,
     kDCAxy,
     kDCAz,
     kDCAxySigma,
@@ -90,6 +92,11 @@ class AliAnalysisTaskFlowSpectators : public AliAnalysisTaskSE {
     kTPCchi2pCls,
     kFilterBits,
     kNVars = kFilterBits + kNFilterBits
+  };
+
+  enum class Periods {
+    LHC10h,
+    LHC17n
   };
 
   AliAnalysisTaskFlowSpectators();
@@ -102,11 +109,9 @@ class AliAnalysisTaskFlowSpectators : public AliAnalysisTaskSE {
   void SetCorrectionFile(std::string name) { fCorrectionFileName = name; }
   void AddCumulantFlowAnalyses(const YAML::Node &node);
   void AddEllipticFlowAnalyses(const YAML::Node &node);
-  void ConfigureBinning(int nbinsxy, int nbinsz, bool equalize, double eta_gap, const std::vector<double> &pt_bins,
+  void ConfigureBinning(bool equalize, double eta_gap, const std::vector<double> &pt_bins,
                         const std::vector<double> &vtxz_bins, int n_phi_bins, int n_eta_bins, double eta_min,
                         double eta_max) {
-    fDelayedNbinsXY = nbinsxy;
-    fDelayedNbinsZ = nbinsz;
     fDelayedEqualize = equalize;
     fDelayedEtaGap = eta_gap;
     fDelayedPtBins = pt_bins;
@@ -122,9 +127,14 @@ class AliAnalysisTaskFlowSpectators : public AliAnalysisTaskSE {
     fCorrectionManager = new Qn::CorrectionManager();
     }
 
+  void SetPeriod(std::string period) {
+    if (period == "LHC10h") fPeriod = Periods::LHC10h;
+    if (period == "LHC17n") fPeriod = Periods::LHC17n;
+  }
+
  private:
   void ApplyConfiguration();
-  void ConfigureCorrectionBinning(int nbinsxy, int nbinsz, bool equalize);
+  void ConfigureCorrectionBinning(bool equalize);
   void ConfigureCumulantAnalysis(double eta_gap, const std::vector<double> &pt_bins,
                                  const std::vector<double> &vtxz_bins, int n_phi_bins, int n_eta_bins, double eta_min,
                                  double eta_max);
@@ -133,13 +143,15 @@ class AliAnalysisTaskFlowSpectators : public AliAnalysisTaskSE {
     for (auto &entry : fSamples) entry = fPoisson(fRandomGenerator);
   }
   void AnalyzeEvent(AliAODEvent *event);
-  bool MultiplicityCut(AliAODEvent *event);
+  bool PileUpCut(AliAODEvent *event);
+  void GetCentrality(AliAODEvent *event);
 
   Bool_t fActivateQnTools = false;
+  Periods fPeriod = Periods::LHC10h;
 
+  Float_t fValCentralityV0M;
+  Float_t fValCentralityCL1;
   // delayed configuration
-  Int_t fDelayedNbinsXY;
-  Int_t fDelayedNbinsZ;
   Bool_t fDelayedEqualize;
   Double_t fDelayedEtaGap;
   std::vector<Double_t> fDelayedPtBins;
@@ -161,13 +173,18 @@ class AliAnalysisTaskFlowSpectators : public AliAnalysisTaskSE {
 
   // Pileup cut using multiplicities of TPC only and global tracks
   TH2D *fNtracksESDvsNclsITS = nullptr;
+  TH2D *fMultiplicityTPCHybridVsCentralityV0M = nullptr;     // before cut
   TH2D *fMultiplicityTPConlyVsGlobal = nullptr;     // before cut
   TH2D *fMultiplicityTPConlyVsGlobalCut = nullptr;  // after cut
   TH2D *fNSigmaTPConlyVsGlobal = nullptr;           // nsigma distribution around mean
-  TGraph *fMultMean = nullptr;                      // linear fit to mean of tpc only tracks
-  TGraph *fMult3SigmaPlus = nullptr;                // mean + 3sigma
-  TGraph *fMult3SigmaMinus = nullptr;               // mean - 3 sigma
+  TH2D *fNClustersITSvsNTrackletsITS = nullptr;
+  TH2D *fNtracksTPConlyVsNtracksESD = nullptr;
+  TH1F *fV0MMultiplicity = nullptr;
+
   TH1D *fCentralityWeightInput = nullptr;           // centrality weight after pileup cut
+  
+  std::vector<TProfile *> fTPCMultVsITSCls;
+  int fMultCutNTracksGlobal;
 
   // Subsampling parameters
   Int_t fNsamples = 10;                                         /// Number of samples
@@ -215,9 +232,14 @@ class AliAnalysisTaskFlowSpectators : public AliAnalysisTaskSE {
   TH1D *fPsiTPC2 = nullptr;             //!<! eventplane angle QA histogram
   TH1D *fVertexX = nullptr;             //!<! primary vertex QA histogram
   TH1D *fVertexY = nullptr;             //!<! primary vertex QA histogram
+  TH1D *fVertexXnSigma = nullptr;             //!<! primary vertex QA histogram
+  TH1D *fVertexYnSigma = nullptr;             //!<! primary vertex QA histogram
   TH1D *fVertexZ = nullptr;             //!<! primary vertex QA histogram
   TH2D *fVertexXY = nullptr;            //!<! primary vertex QA histogram
   TH2D *fCentralityCL1vsV0M = nullptr;  //!<! centrality correlations cl1 vs v0m
+
+  TVector2 *fVertex_X_n_sigma = nullptr;
+  TVector2 *fVertex_Y_n_sigma = nullptr;
 
   // QA tree variables
   Qn::CorrectionManager *fCorrectionManager = nullptr;

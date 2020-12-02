@@ -22,6 +22,7 @@
 
 #include <map>
 
+#include "AliLog.h"
 #include "AliAODEvent.h"
 #include "AliAODTrack.h"
 #include "AliAODTracklets.h"
@@ -33,6 +34,7 @@
 #include "AliOADBContainer.h"
 #include "AliQvectors.h"
 #include "AliZDCflowCuts.h"
+#include "AliAODTracklets.h"
 
 AliAnalysisTaskFlowSpectators::AliAnalysisTaskFlowSpectators() : AliAnalysisTaskSE() {}
 
@@ -49,6 +51,8 @@ AliAnalysisTaskFlowSpectators::~AliAnalysisTaskFlowSpectators() {
   delete fTree;
   delete fAnalysisUtils;
   delete fCorrectionManager;
+  for (auto hist : fTPCMultVsITSCls) delete hist;
+  fTPCMultVsITSCls.clear();
 }
 
 void AliAnalysisTaskFlowSpectators::UserCreateOutputObjects() {
@@ -122,15 +126,34 @@ void AliAnalysisTaskFlowSpectators::UserCreateOutputObjects() {
   fQAList->Add(fCentralityV0M);
   fQAList->Add(fCentralityCL1);
   fQAList->Add(fCentralityCL1vsV0M);
-  fVertexX = new TH1D("VertexX", ";vertex x / cm;N", 50, -0.03, 0.02);
-  fVertexY = new TH1D("VertexY", ";vertex y / cm;N", 50, 0.14, 0.21);
+  double vxl, vxh, vyl, vyh;
+  if (fPeriod == Periods::LHC17n) {
+    vxl = 0.045;
+    vxh = 0.09;
+    vyl = 0.36;
+    vyh = 0.4;
+  }
+  if (fPeriod == Periods::LHC10h) {
+    vxl = -0.03;
+    vxh = 0.02;
+    vyl = 0.14;
+    vyh = 0.21;
+  }
+  fVertexX = new TH1D("VertexX", ";vertex x / cm;N", 50, vxl, vxh);
+  fVertexY = new TH1D("VertexY", ";vertex y / cm;N", 50, vyl, vyh);
+  fVertexXY = new TH2D("VertexXVertexY", ";vertex x; vertex y;N", 50, vxl, vxh, 50, vyl, vyh);  
+  fVertexXnSigma = new TH1D("VertexXnSigma", ";vertex x n sigma;N", 50, -3., 3.);
+  fVertexYnSigma = new TH1D("VertexYnSigma", ";vertex y n sigma;N", 50, -3., 3.);
   fVertexZ = new TH1D("VertexZ", ";vertex z / cm;N", 50, -10., 10.);
-  fVertexXY = new TH2D("VertexXVertexY", ";vertex x; vertex y;N", 50, -0.03, 0.02, 50, 0.14, 0.21);
   fQAList->Add(fVertexX);
   fQAList->Add(fVertexY);
+  fQAList->Add(fVertexXnSigma);
+  fQAList->Add(fVertexYnSigma);
   fQAList->Add(fVertexZ);
   fQAList->Add(fVertexXY);
 
+  fMultiplicityTPCHybridVsCentralityV0M =
+      new TH2D("MultiplicityTPCHybridVsCentralityV0M", ";centrality v0m ;n tracks tpc hybrid", 90, 0., 90., 5000., 0., 5000.);
   fMultiplicityTPConlyVsGlobal =
       new TH2D("MultiplicityTPConlyvsGlobal", ";global;tpc only", 1500, 0., 3000., 2000, 0., 4000.);
   fMultiplicityTPConlyVsGlobalCut =
@@ -139,10 +162,19 @@ void AliAnalysisTaskFlowSpectators::UserCreateOutputObjects() {
       new TH2D("fNSigmaTPConlyVsGlobal", ";global;N sigma ;tpc only", 1500, 0., 3000., 500, -10., 10.);
   fNtracksESDvsNclsITS =
       new TH2D("NtracksESDvsNclsITS", ";esd tracks;ITS clusters", 1500, 0., 14000., 2000, 0., 26000.);
+  fNClustersITSvsNTrackletsITS = new TH2D("NClustersITSvsNTrackletsITS", ";ITS clusters;ITS tracklets", 2000, 0., 14000., 2000, 0., 4000.);
+  fNtracksTPConlyVsNtracksESD = new TH2D("NtracksTPConlyVsNtracksESD", ";n tracks tpc; ntracks esd", 2000, 0., 4000., 2000, 0., 14000.);
+
+  fV0MMultiplicity = new TH1F("V0MMultiplicity", ";V0MMultiplcity; N", 5000, 0., 40000.);
+
+  fQAList->Add(fMultiplicityTPCHybridVsCentralityV0M);
   fQAList->Add(fMultiplicityTPConlyVsGlobal);
   fQAList->Add(fMultiplicityTPConlyVsGlobalCut);
   fQAList->Add(fNSigmaTPConlyVsGlobal);
   fQAList->Add(fNtracksESDvsNclsITS);
+  fQAList->Add(fNClustersITSvsNTrackletsITS);
+  fQAList->Add(fNtracksTPConlyVsNtracksESD);
+  fQAList->Add(fV0MMultiplicity);
 
   fPsiZA = new TH1D("Psi_ZNA", ";#Psi_{ZNA};N", 50, 0., 2 * TMath::Pi());
   fPsiZC = new TH1D("Psi_ZNC", ";#Psi_{ZNC};N", 50, 0., 2 * TMath::Pi());
@@ -168,7 +200,8 @@ void AliAnalysisTaskFlowSpectators::UserCreateOutputObjects() {
   fAnalysisUtils->SetUseMVPlpSelection(true);
   fAnalysisUtils->SetUseOutOfBunchPileUp(true);
 
-  fEventCuts.SetupRun1PbPb();
+  if (fPeriod == Periods::LHC10h) { fEventCuts.SetupRun1PbPb(); }
+  if (fPeriod == Periods::LHC17n) { fEventCuts.SetupLHC17n(); }
 
   fOutputList = new TList();
   fOutputList->SetOwner(true);
@@ -184,6 +217,7 @@ void AliAnalysisTaskFlowSpectators::UserCreateOutputObjects() {
 // Reads corrections from the OADB file for each new run.
 // Logs the status of corrections in the fCorrectionStep histogram.
 void AliAnalysisTaskFlowSpectators::NotifyRun() {
+  AliLog::SetClassDebugLevel("AliAnalysisTaskFlowSpectators",AliLog::kInfo);
   // QnTools
   if (fActivateQnTools) {
     AliInfo(TString::Format("New run number: %d", this->fCurrentRunNumber).Data());
@@ -196,22 +230,35 @@ void AliAnalysisTaskFlowSpectators::NotifyRun() {
     fQZNAmagnitude.ReadFile(file);
     fQZNCmagnitude.ReadFile(file);
 
-    // Multiplicity Cut
-    auto graph3sigmap = dynamic_cast<TGraph *>(file->Get("TPConlyVsGlobalMeanPlusSigma3"));
-    auto graph3sigmam = dynamic_cast<TGraph *>(file->Get("TPConlyVsGlobalMeanMinusSigma3"));
-    auto graphmean = dynamic_cast<TGraph *>(file->Get("TPConlyVsGlobalMean"));
-    if (graph3sigmap && graph3sigmam && graphmean) {
-      std::cout << "multiplicity cut found" << std::endl;
-      fMult3SigmaPlus = graph3sigmap;
-      fMult3SigmaMinus = graph3sigmam;
-      fMultMean = graphmean;
+    
+    for (int i = 0; i < 6; ++i) {
+      auto name = TString::Format("nTPCTracksHybrid_NClsITSLayer_%d_cut", i);
+      auto hist = dynamic_cast<TProfile*>(file->Get(name));
+      if (hist) {
+        AliDebug(AliLog::kInfo,name);
+        hist->SetDirectory(0);
+        fTPCMultVsITSCls.push_back(hist);
+      }
+    }
+    if (fTPCMultVsITSCls.size()==6) {
+      AliDebug(AliLog::kInfo,"using multiplicity outlier cut.");
     }
 
     // Centrality Weight
     fCentralityWeightInput = dynamic_cast<TH1D *>(file->Get("CentralityWeights"));
     if (fCentralityWeightInput) {
       fCentralityWeightInput->SetDirectory(0);
-      std::cout << "using Centrality weights" << std::endl;
+      AliDebug(AliLog::kInfo,"using centrality weights");
+    } else {
+      AliDebug(AliLog::kInfo,"Running without centrality weights");
+    }
+    auto vtxx_oadb = dynamic_cast<AliOADBContainer*>(file->Get("VtxXMeanSigma"));
+    auto vtxy_oadb = dynamic_cast<AliOADBContainer*>(file->Get("VtxYMeanSigma"));
+    if (vtxx_oadb && vtxy_oadb) {
+      fVertex_X_n_sigma = dynamic_cast<TVector2*>(vtxx_oadb->GetObject(fCurrentRunNumber));
+      fVertex_Y_n_sigma = dynamic_cast<TVector2*>(vtxy_oadb->GetObject(fCurrentRunNumber));
+    } else {
+      AliDebug(AliLog::kError, "Vertex Mean and Sigma not found in File! Will not process Q vectors.");
     }
 
     // nd
@@ -237,7 +284,6 @@ void AliAnalysisTaskFlowSpectators::NotifyRun() {
     // cumulants
     for (auto &analysis : fCumulantFlowAnalyses) {
       analysis.OpenCorrection(file, fCurrentRunNumber);
-      analysis.OpenPtEfficiencies(file);
     }
     file->Close();
   }
@@ -252,17 +298,20 @@ void AliAnalysisTaskFlowSpectators::UserExec(Option_t *) {
       dynamic_cast<AliInputEventHandler *>(AliAnalysisManager::GetAnalysisManager()->GetInputEventHandler());
   if (!eventhandler->IsEventSelected()) return;
   if (!fEventCuts.AcceptEvent(event)) return;
-  if (fAnalysisUtils->IsPileUpEvent(event)) return;
-  if (MultiplicityCut(event)) {
+  if (fActivateQnTools) fValues = fCorrectionManager->GetVariableContainer();
+  if (PileUpCut(event)) {
     AnalyzeEvent(event);
   }
-  fTree->Fill();
   PostData(1, fStorage);
   PostData(2, fTree);
 }
 
-bool AliAnalysisTaskFlowSpectators::MultiplicityCut(AliAODEvent *event) {
+bool AliAnalysisTaskFlowSpectators::PileUpCut(AliAODEvent *event) {
   bool pass = true;
+  // AliAnalysisUtils pileup event checks
+  if (fPeriod == Periods::LHC10h && fAnalysisUtils->IsPileUpEvent(event)) return false;
+  GetCentrality(event);
+  // global vs tpc only tracks
   double ntracks_tpc_only = 0.;
   double ntracks_global = 0.;
   const unsigned int ntracks = event->GetNumberOfTracks();
@@ -276,71 +325,28 @@ bool AliAnalysisTaskFlowSpectators::MultiplicityCut(AliAODEvent *event) {
   for (int i = 2; i < 6; ++i) {
     sum_its_cls += event->GetNumberOfITSClusters(i);
   }
+  fNtracksTPConlyVsNtracksESD->Fill(event->GetNumberOfESDTracks() - ntracks_tpc_only, ntracks_tpc_only);
+  fNClustersITSvsNTrackletsITS->Fill(sum_its_cls, event->GetTracklets()->GetNumberOfTracklets());
   fNtracksESDvsNclsITS->Fill(event->GetNumberOfESDTracks(), sum_its_cls);
   fMultiplicityTPConlyVsGlobal->Fill(ntracks_global, ntracks_tpc_only);
-  if (fMultMean && fMult3SigmaPlus && fMult3SigmaMinus) {
-    auto max = fMult3SigmaPlus->Eval(ntracks_global);
-    auto min = fMult3SigmaMinus->Eval(ntracks_global);
-    if (ntracks_tpc_only < min || ntracks_tpc_only > max) pass = false;
-    auto mean = fMultMean->Eval(ntracks_global);
-    auto nsigma = 3. * (ntracks_tpc_only - mean) / (max - mean);
-    fNSigmaTPConlyVsGlobal->Fill(ntracks_global, nsigma);
-  }
-  if (pass) {
-    fMultiplicityTPConlyVsGlobalCut->Fill(ntracks_global, ntracks_tpc_only);
-  }
+  fMultiplicityTPCHybridVsCentralityV0M->Fill(fValCentralityV0M, ntracks_global);
+  fMultCutNTracksGlobal = ntracks_global;
   return pass;
 }
 
 void AliAnalysisTaskFlowSpectators::AnalyzeEvent(AliAODEvent *event) {
   // QnTools
-  if (fActivateQnTools) {
-    fValues = fCorrectionManager->GetVariableContainer();
-  }
-  bool run_1 = false;
-  if (event->GetRunNumber() < 200000) run_1 = true;
-  float cent_v0m;
-  float cent_cl1;
-  if (run_1) {
-    // Run 1
-    auto centrality = event->GetCentrality();
-    if (centrality) {
-      if (fActivateQnTools) {
-        fValues[kCentV0A] = centrality->GetCentralityPercentile("V0A");
-        fValues[kCentV0C] = centrality->GetCentralityPercentile("V0C");
-        fValues[kCentV0M] = centrality->GetCentralityPercentile("V0M");
-        fValues[kCentZNC] = centrality->GetCentralityPercentile("ZNC");
-        fValues[kCentZNA] = centrality->GetCentralityPercentile("ZNA");
-        fValues[kCentCL0] = centrality->GetCentralityPercentile("CL0");
-        fValues[kCentCL1] = centrality->GetCentralityPercentile("CL1");
-      }
-      cent_v0m = centrality->GetCentralityPercentile("V0M");
-      cent_cl1 = centrality->GetCentralityPercentile("CL1");
-    }
-  } else {
-    // Run 2
-    auto centrality = dynamic_cast<AliMultSelection *>(event->FindListObject("MultSelection"));
-    if (centrality) {
-      if (fActivateQnTools) {
-        fValues[kCentV0A] = centrality->GetMultiplicityPercentile("V0A");
-        fValues[kCentV0C] = centrality->GetMultiplicityPercentile("V0C");
-        fValues[kCentV0M] = centrality->GetMultiplicityPercentile("V0M");
-        fValues[kCentZNC] = centrality->GetMultiplicityPercentile("ZNC");
-        fValues[kCentZNA] = centrality->GetMultiplicityPercentile("ZNA");
-        fValues[kCentCL0] = centrality->GetMultiplicityPercentile("CL0");
-        fValues[kCentCL1] = centrality->GetMultiplicityPercentile("CL1");
-      }
-      cent_v0m = centrality->GetMultiplicityPercentile("V0M");
-      cent_cl1 = centrality->GetMultiplicityPercentile("CL1");
-    }
-  }
+  float cent_v0m = fValCentralityV0M;
+  float cent_cl1 = fValCentralityCL1;
   if (cent_v0m < 0. || cent_v0m > 90.) return;
-
+  AliDebug(AliLog::kDebug, "Event passed centrality cuts");
   const AliAODVertex *vtx = event->GetPrimaryVertex();
   const auto vtxx = vtx->GetX();
   const auto vtxy = vtx->GetY();
   const auto vtxz = vtx->GetZ();
+
   if (std::fabs(vtxz) > 10.) return;
+
   if (fActivateQnTools) {
     fValues[kVtxX] = vtxx;
     fValues[kVtxY] = vtxy;
@@ -351,30 +357,70 @@ void AliAnalysisTaskFlowSpectators::AnalyzeEvent(AliAODEvent *event) {
     fValues[kOrbitNumber] = event->GetOrbitNumber();
     fValues[kBunchCrossNumber] = event->GetBunchCrossNumber();
   }
-  fVertexX->Fill(vtxx);
-  fVertexY->Fill(vtxy);
+
   fVertexZ->Fill(vtxz);
   fVertexXY->Fill(vtxx, vtxy);
-
+  fVertexX->Fill(vtxx);
+  fVertexY->Fill(vtxy);
   fCentralityV0M->Fill(cent_v0m);
   fCentralityCL1->Fill(cent_cl1);
   fCentralityCL1vsV0M->Fill(cent_cl1, cent_v0m);
+
+  double vtxx_nsigma = -999.;
+  double vtxy_nsigma = -999.;
+  if (fVertex_X_n_sigma && fVertex_Y_n_sigma) {
+    vtxx_nsigma = (vtxx - fVertex_X_n_sigma->X()) / fVertex_X_n_sigma->Y();
+    vtxy_nsigma = (vtxy - fVertex_Y_n_sigma->X()) / fVertex_Y_n_sigma->Y();
+  } else {
+    fCorrectionManager->ProcessEvent();
+    fCorrectionManager->ProcessCorrections();
+    return;
+  }
+
+
+  AliDebug(AliLog::kDebug, "Event passed vertex cuts");
+  fVertexXnSigma->Fill(vtxx_nsigma);
+  fVertexYnSigma->Fill(vtxy_nsigma);
+
+  auto vzero = event->GetVZEROData();
+  auto vzeromult = vzero->GetMTotV0A()+vzero->GetMTotV0C();
+  fV0MMultiplicity->Fill(vzeromult);
+  fValues[kV0Mult] = vzeromult;
+
   // Create Bootstrap samples using Poisson
   GetSamples();
   // Set Correction variables for the crosscheck corrections
-  std::vector<double> variables = {cent_v0m, vtxx, vtxy, vtxz};
+  std::vector<double> variables = {cent_v0m, vtxx_nsigma, vtxy_nsigma, vtxz};
 
   // Find the centrality weight
   double centrality_weight = 1.;
   if (fCentralityWeightInput) {
     centrality_weight = fCentralityWeightInput->GetBinContent(fCentralityWeightInput->FindBin(cent_v0m));
   }
+
+  std::vector<double> means;
+  std::vector<double> sigmas;
+  std::vector<int> ncls_its;
+
+  for (int i = 0; i < 6; ++i) {
+    const auto its = event->GetNumberOfITSClusters(i);
+    ncls_its.push_back(its);
+    if (fTPCMultVsITSCls.size() == 6) {
+      const auto bin = fTPCMultVsITSCls[i]->FindBin(its);
+      means.push_back(fTPCMultVsITSCls[i]->GetBinContent(bin));
+      sigmas.push_back(fTPCMultVsITSCls[i]->GetBinError(bin));
+    }
+  }
+
+  std::vector<double> centrality_estimators {cent_v0m, cent_cl1};
   for (auto &analysis : fEllipticFlowAnalyses) {
-    analysis.FindCentralityBin(event, cent_v0m, fSamples);
+    analysis.Cuts().CheckMultPileup(fMultCutNTracksGlobal, ncls_its, means, sigmas, cent_v0m);
+    analysis.FindCentralityBin(event, centrality_estimators, fSamples);
     analysis.SetCentralityWeight(centrality_weight);
   }
   for (auto &analysis : fCumulantFlowAnalyses) {
-    analysis.FindCentralityBin(event, cent_v0m, fSamples);
+    analysis.Cuts().CheckMultPileup(fMultCutNTracksGlobal, ncls_its, means, sigmas, cent_v0m);
+    analysis.FindCentralityBin(event, centrality_estimators, fSamples);
     analysis.SetCentralityWeight(centrality_weight);
   }
 
@@ -431,21 +477,21 @@ void AliAnalysisTaskFlowSpectators::AnalyzeEvent(AliAODEvent *event) {
   if (fRecenter4DZNA.IsApplied() && fRecenter4DZNC.IsApplied()) {
     qvectors_zdc.emplace("recentered", q_zn_recentered);
   }
+  AliDebug(AliLog::kDebug, "Recentered Qvector of ZN");
 
   // Build Q-vector of V0A and V0C
   AliZDCQvectors q_v0_plain;
   const double kPiDiv8 = 0.39269908;
   const std::array<double, 8> phiv0 = {1 * kPiDiv8, 3 * kPiDiv8,  5 * kPiDiv8,  7 * kPiDiv8,
                                        9 * kPiDiv8, 11 * kPiDiv8, 13 * kPiDiv8, 15 * kPiDiv8};
-  auto vzero = event->GetVZEROData();
   double vzerothreshold = 1e-3;
   for (unsigned int ich = 0; ich < 32; ich++) {
     double wv0a = vzero->GetMultiplicityV0A(ich);
     double wv0c = vzero->GetMultiplicityV0C(ich);
     // QnTools
     if (fActivateQnTools) {
-      fValues[kV0AChPhi + ich] = 2. * phiv0[ich % 8];
-      fValues[kV0CChPhi + ich] = 2. * phiv0[ich % 8];
+      fValues[kV0AChPhi + ich] = phiv0[ich % 8];
+      fValues[kV0CChPhi + ich] = phiv0[ich % 8];
       fValues[kV0AChMult + ich] = wv0a;
       fValues[kV0CChMult + ich] = wv0c;
     }
@@ -465,10 +511,13 @@ void AliAnalysisTaskFlowSpectators::AnalyzeEvent(AliAODEvent *event) {
   q_vzero_recentered.c = fRecenter4DV0C.Apply(q_v0_plain.c, variables.data());
   qvectors_vzero.emplace("recentered", q_vzero_recentered);
 
+  AliDebug(AliLog::kDebug, "Recentered Qvector of VZERO");
+
   // QnTools
   if (fActivateQnTools) {
     fCorrectionManager->ProcessEvent();
     fCorrectionManager->FillChannelDetectors();
+    AliDebug(AliLog::kDebug, "Filled Q-Vectors to QnTools");
   }
   // Track loop
   // builds TPC q-vector in cumulant analysis
@@ -477,6 +526,7 @@ void AliAnalysisTaskFlowSpectators::AnalyzeEvent(AliAODEvent *event) {
   AliZDCflowCuts cut;
   cut.CheckEventCuts(event);
   const unsigned int ntracks = event->GetNumberOfTracks();
+  auto ptweight_spline = fCumulantFlowAnalyses.at(0).GetPtSplineIntegrated();
   for (unsigned int i = 0; i < ntracks; ++i) {
     auto track = static_cast<AliAODTrack *>(event->GetTrack(i));
     if (!track) continue;
@@ -491,10 +541,18 @@ void AliAnalysisTaskFlowSpectators::AnalyzeEvent(AliAODEvent *event) {
       fValues[kPhi] = track->Phi();
       fValues[kPt] = track->Pt();
       fValues[kEta] = track->Eta();
+      if (ptweight_spline) {
+        auto w = ptweight_spline->Eval(fValues[kPt]);
+        if (w > 0.) fValues[kPtWeight] = 1. / w;
+        else        fValues[kPtWeight] = 1.;
+      } else {
+        fValues[kPtWeight] = 1.;
+      }
       fValues[kCharge] = track->GetSign();
       fCorrectionManager->FillTrackingDetectors();
     }
   }
+  AliDebug(AliLog::kDebug, "Finished track loop");
   if (fActivateQnTools) {
     fValues[kNTPCTracksHybrid] = ntracks_hybrid;
     fValues[kNTPCTracksTPConly] = ntracks_tpconly;
@@ -552,6 +610,8 @@ void AliAnalysisTaskFlowSpectators::AnalyzeEvent(AliAODEvent *event) {
   fPsiZC->Fill(q_zn_plain.c.Psi());
   fPsiZAEQ->Fill(q_zn_equalized.a.Psi());
   fPsiZCEQ->Fill(q_zn_equalized.c.Psi());
+
+  AliDebug(AliLog::kDebug, "Finished Event");
 }
 
 void AliAnalysisTaskFlowSpectators::Terminate(Option_t *option) {
@@ -575,7 +635,7 @@ void AliAnalysisTaskFlowSpectators::AddEllipticFlowAnalyses(const YAML::Node &no
 }
 
 void AliAnalysisTaskFlowSpectators::ApplyConfiguration() {
-  ConfigureCorrectionBinning(fDelayedNbinsXY, fDelayedNbinsZ, fDelayedEqualize);
+  ConfigureCorrectionBinning(fDelayedEqualize);
   ConfigureCumulantAnalysis(fDelayedEtaGap, fDelayedPtBins, fDelayedVtxZBins, fDelayedNphiBins, fDelayedNetaBins,
                             fDelayedEtaMin, fDelayedEtaMax);
   ConfigureEllipticAnalysis(fDelayedPtBins);
@@ -596,7 +656,7 @@ void AliAnalysisTaskFlowSpectators::ConfigureCumulantAnalysis(double eta_gap, co
   }
 }
 
-void AliAnalysisTaskFlowSpectators::ConfigureCorrectionBinning(int nbinsxy, int nbinsz, bool equalize) {
+void AliAnalysisTaskFlowSpectators::ConfigureCorrectionBinning(bool equalize) {
   // ND correction
   std::vector<TAxis *> axes;
   auto make_axis = [](std::vector<TAxis *> &axes, std::string name, int n, double lo, double hi) {
@@ -604,11 +664,16 @@ void AliAnalysisTaskFlowSpectators::ConfigureCorrectionBinning(int nbinsxy, int 
     axis->SetName(name.c_str());
     axes.push_back(axis);
   };
-  make_axis(axes, "centV0M", 100, 0., 100.);
-  make_axis(axes, "VtxX", 3, 0., 100.);  // binning configured run by run.
-  make_axis(axes, "VtxY", 3, 0., 100.);  // binning configured run by run.
-  make_axis(axes, "VtxZ", 3, 0., 100.);  // binning configured run by run.
-  std::vector<std::string> rbrvars{"VtxX", "VtxY", "VtxZ"};
+  auto make_axis_v = [](std::vector<TAxis *> &axes, std::string name, int n, std::vector<double> bins) {
+  auto axis = new TAxis(n, bins.data());
+  axis->SetName(name.c_str());
+  axes.push_back(axis);
+  };
+  make_axis(axes, "centV0M", 90, 0., 90.); 
+  make_axis_v(axes, "AxisVtxXnSigma", 3, {-3., -0.42, 0.42, 3.});
+  make_axis_v(axes, "AxisVtxYnSigma", 3, {-3., -0.42, 0.42, 3.});
+  make_axis(axes, "AxisVtxZ", 4, 0., 100.);  // binning configured run by run.
+  std::vector<std::string> rbrvars{"AxisVtxZ"};
   fRecenter4DZNA.Configure("ZNA_4D", axes, rbrvars, equalize, 5);
   fRecenter4DZNC.Configure("ZNC_4D", axes, rbrvars, equalize, 5);
 
@@ -622,4 +687,42 @@ void AliAnalysisTaskFlowSpectators::ConfigureCorrectionBinning(int nbinsxy, int 
   make_axis(axes_align, "centV0M", 10, 0., 100.);
   fAlignZNA.Configure("ZNA_Align_all", axes_align, {}, 5);
   fAlignZNC.Configure("ZNC_Align_all", axes_align, {}, 5);
+}
+
+void AliAnalysisTaskFlowSpectators::GetCentrality(AliAODEvent *event) {
+  bool run_1 = false;
+  if (event->GetRunNumber() < 200000) run_1 = true;
+  if (run_1) {
+    // Run 1
+    auto centrality = event->GetCentrality();
+    if (centrality) {
+      if (fActivateQnTools) {
+        fValues[kCentV0A] = centrality->GetCentralityPercentile("V0A");
+        fValues[kCentV0C] = centrality->GetCentralityPercentile("V0C");
+        fValues[kCentV0M] = centrality->GetCentralityPercentile("V0M");
+        fValues[kCentZNC] = centrality->GetCentralityPercentile("ZNC");
+        fValues[kCentZNA] = centrality->GetCentralityPercentile("ZNA");
+        fValues[kCentCL0] = centrality->GetCentralityPercentile("CL0");
+        fValues[kCentCL1] = centrality->GetCentralityPercentile("CL1");
+      }
+      fValCentralityV0M = centrality->GetCentralityPercentile("V0M");
+      fValCentralityCL1 = centrality->GetCentralityPercentile("CL1");
+    }
+  } else {
+    // Run 2
+    auto centrality = dynamic_cast<AliMultSelection *>(event->FindListObject("MultSelection"));
+    if (centrality) {
+      if (fActivateQnTools) {
+        fValues[kCentV0A] = centrality->GetMultiplicityPercentile("V0A");
+        fValues[kCentV0C] = centrality->GetMultiplicityPercentile("V0C");
+        fValues[kCentV0M] = centrality->GetMultiplicityPercentile("V0M");
+        fValues[kCentZNC] = centrality->GetMultiplicityPercentile("ZNC");
+        fValues[kCentZNA] = centrality->GetMultiplicityPercentile("ZNA");
+        fValues[kCentCL0] = centrality->GetMultiplicityPercentile("CL0");
+        fValues[kCentCL1] = centrality->GetMultiplicityPercentile("CL1");
+      }
+      fValCentralityV0M = centrality->GetMultiplicityPercentile("V0M");
+      fValCentralityCL1 = centrality->GetMultiplicityPercentile("CL1");
+    }
+  }
 }

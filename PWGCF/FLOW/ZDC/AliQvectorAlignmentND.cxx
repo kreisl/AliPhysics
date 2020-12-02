@@ -16,6 +16,7 @@
 #include <iostream>
 #include "AliOADBContainer.h"
 #include "AliQvectorAlignmentND.h"
+#include "AliLog.h"
 
 void AliQvectorAlignmentND::Configure(std::string name,
                                        const std::vector<TAxis*> &axes,
@@ -32,6 +33,11 @@ void AliQvectorAlignmentND::Make(TFile *file, int run_number, TList *corrections
   AddHistogramsToList(corrections);
   AddQAToList(qa);
   OpenCorrection(file, run_number);
+  if (fIsApplied) {
+    AliDebug(AliLog::kInfo, (fName+": Applying alignment").c_str());
+  } else {
+    AliDebug(AliLog::kInfo, (fName+": Collecting alignment information").c_str());
+  }
 }
 
 AliQvector AliQvectorAlignmentND::Apply(const AliQvector q, const AliQvector qa, double *variables) {

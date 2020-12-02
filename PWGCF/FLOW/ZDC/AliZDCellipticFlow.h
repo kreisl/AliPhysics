@@ -25,7 +25,7 @@ class AliZDCellipticFlow : public AliZDCanalysis {
   AliZDCellipticFlow(std::string name) : AliZDCanalysis(name) {}
   virtual ~AliZDCellipticFlow() = default;
   virtual TList *CreateCorrelations();
-  virtual void FindCentralityBin(AliAODEvent *event, Double_t centrality, const std::vector<Int_t> &samples);
+  virtual void FindCentralityBin(AliAODEvent *event, std::vector<Double_t> centralities, const std::vector<Int_t> &samples);
   void FillPerTrackCorrelations(AliAODTrack *track);
   void FillPerEventCorrelations();
   void SetPtBins(const std::vector<double> &pt_bins) {
@@ -44,6 +44,9 @@ class AliZDCellipticFlow : public AliZDCanalysis {
   TAxis* fAxisPt = nullptr;       //!<! p_T axis
   Int_t fCentralityBin = -1;
 
+  TProfile* fTVaCent = nullptr;
+  TProfile* fTVcCent = nullptr;
+  TProfile* fVaVcCent = nullptr;
   TProfile* fVXaZXXCent = nullptr; //!<! Correlation V0 ZNA ZNC Resolution
   TProfile* fVXcZXXCent = nullptr; //!<! Correlation V0 ZNA ZNC Resolution
   TProfile* fVXaVXcCent = nullptr; //!<! Correlation V0 ZNA ZNC Resolution

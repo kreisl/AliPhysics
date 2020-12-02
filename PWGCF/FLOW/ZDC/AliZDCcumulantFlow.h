@@ -37,14 +37,11 @@ class AliZDCcumulantFlow : public AliZDCanalysis {
   virtual ~AliZDCcumulantFlow() {
     delete fAxisPt;
     delete fNUAweightsIn;
-    for (auto spline : fPtEfficienciesSpline) {
+    for (auto spline : fPtEfficiencySplinesCentralityClasses) {
       delete spline;
     }
-    for (auto fit : fPtEfficienciesFit) {
-      delete fit;
-    }
   }
-  void FindCentralityBin(AliAODEvent *event, Double_t centrality, const std::vector<Int_t> &samples);
+  virtual void FindCentralityBin(AliAODEvent *event, std::vector<Double_t> centralities, const std::vector<Int_t> &samples);
   void OpenCorrection(TFile *file, Int_t run_number); 
   void AddCorrectionsToList(TList *hlist, TList *qalist);
   void Configure(double eta_gap, std::vector<double> pt_bins,
@@ -54,6 +51,7 @@ class AliZDCcumulantFlow : public AliZDCanalysis {
   void FillPerTrackCorrelations(AliAODTrack *track);
   void CalculateCumulants();
   void FillESE(double qzna, double qznc);
+  TSpline3* GetPtSplineIntegrated() { return fPtEfficiencySpline; }
 
   void SetBootStrapSamples(int n) {
     fNsamples = n;
@@ -66,6 +64,7 @@ class AliZDCcumulantFlow : public AliZDCanalysis {
     if (analysis_settings.IsDefined()) {
       ParseFlag(fApplyNUA, analysis_settings, "nua_weights");
       ParseFlag(fApplyNUE, analysis_settings, "nue_weights");
+      ParseFlag(fUseNUEintegrated, analysis_settings, "nue_weights_integrated");
     }
     fCuts.ReadYAMLnode(node);
   }
@@ -96,6 +95,7 @@ class AliZDCcumulantFlow : public AliZDCanalysis {
   TH3D* ReadFromOADB(TFile *file, const std::string&oadb_name, Int_t run_number);
   void ScaleNUA(TH3D* unscaled, TH3D* scaled);
 
+  bool fUseNUEintegrated = true;
   bool fUseEtaGap = false;
   bool fApplyNUA  = true;
   bool fApplyNUE  = true;
@@ -120,7 +120,8 @@ class AliZDCcumulantFlow : public AliZDCanalysis {
   std::vector<Qv<4,4>> fQetaGapP; //!<!
   TAxis* fAxisPt = nullptr;       //!<! p_T axis
   std::vector<TF1*> fPtEfficienciesFit; //!<! pt efficiency
-  std::vector<TSpline3*> fPtEfficienciesSpline; //!<! pt efficiency
+  TSpline3* fPtEfficiencySpline = nullptr; //!<! pt efficiency
+  std::vector<TSpline3*> fPtEfficiencySplinesCentralityClasses; //!<!
   TH1D* fAreWeightsApplied = nullptr;
   TH3D* fNUAweightsIn = nullptr;
   TH3D* fNUAweightsScaled = nullptr;

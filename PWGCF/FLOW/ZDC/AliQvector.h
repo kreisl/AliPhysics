@@ -38,12 +38,8 @@ struct AliQvector {
     return std::sqrt(x*x + y*y);
   }
 
-  inline double MagnitudeRaw() const {
-    return std::sqrt(x*x*sum*sum + y*y*sum*sum);
-  }
-
   inline double q() const {
-    return MagnitudeRaw() / std::sqrt(sum);
+    return Magnitude() * sum / std::sqrt(sum);
   }
 
   AliQvector Recenter(double x_mean, double y_mean,

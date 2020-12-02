@@ -35,7 +35,7 @@ struct Qv {
       auto prefactor = std::pow(weight, p);
       ref(0,p) += std::complex<double>(prefactor, 0);
       for (auto h = 1u; h <= Harmonics; ++h) {
-        ref(h,p)  += std::complex<double>(prefactor*cos_arr[h],
+        ref( h,p) += std::complex<double>(prefactor*cos_arr[h],
                                           prefactor*sin_arr[h]);
         ref(-h,p) += std::complex<double>( prefactor*cos_arr[h],
                                           -prefactor*sin_arr[h]);

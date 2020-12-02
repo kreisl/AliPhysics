@@ -11,6 +11,7 @@
 #include "TFile.h"
 #include "TList.h"
 
+#include "AliLog.h"
 #include "AliOADBContainer.h"
 
 #include "AliQvector.h"

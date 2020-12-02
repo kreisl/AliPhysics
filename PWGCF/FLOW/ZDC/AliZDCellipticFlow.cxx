@@ -24,11 +24,11 @@
 #include "AliQvectors.h"
 #include "AliZDCellipticFlow.h"
 
-void AliZDCellipticFlow::FindCentralityBin(AliAODEvent *event, Double_t centrality, const std::vector<Int_t> &samples) {
+void AliZDCellipticFlow::FindCentralityBin(AliAODEvent *event, std::vector<Double_t> centralities, const std::vector<Int_t> &samples) {
   fCuts.CheckEventCuts(event);
-  fCentralityBin = fCentralityAxis->FindBin(centrality) - 1;
-  fCentrality = centrality;
-  fCuts.HasPassedCentrality(centrality > 0. && centrality < 90.);
+  fCentrality = fCuts.GetCentrality(centralities);
+  fCentralityBin = fCentralityAxis->FindBin(fCentrality) - 1;
+  fCuts.HasPassedCentrality(fCentrality > 0. && fCentrality < 90.);
   fSamples = samples;
 }
 
@@ -41,27 +41,33 @@ void AliZDCellipticFlow::CalculateCorrelations(Qv<4,4> qtpc,
                                                Qv<4,4> qtpcetan) {
   if (!(fCuts.PassedEventCuts())) return;
 
+  auto weight = 1.;
+  weight *= fCentralityWeight;
+  if (fUseZDCMultWeights) {
+    weight *= fQZA.sum * fQZC.sum;
+  } 
+
   // ZDC and ZDC V0 correlations
-  fXaXcCent->Fill(fCentrality, fQZA.x*fQZC.x, fCentralityWeight);
-  fYaYcCent->Fill(fCentrality, fQZA.y*fQZC.y, fCentralityWeight);
-  fXaYcCent->Fill(fCentrality, fQZA.x*fQZC.y, fCentralityWeight);
-  fYaXcCent->Fill(fCentrality, fQZA.y*fQZC.x, fCentralityWeight);
+  fXaXcCent->Fill(fCentrality, fQZA.x*fQZC.x, weight);
+  fYaYcCent->Fill(fCentrality, fQZA.y*fQZC.y, weight);
+  fXaYcCent->Fill(fCentrality, fQZA.x*fQZC.y, weight);
+  fYaXcCent->Fill(fCentrality, fQZA.y*fQZC.x, weight);
   fXaXcDistCent->Fill(fCentrality,fQZA.x*fQZC.x);
   fYaYcDistCent->Fill(fCentrality,fQZA.y*fQZC.y);
   fXaYcDistCent->Fill(fCentrality,fQZA.x*fQZC.y);
   fYaXcDistCent->Fill(fCentrality,fQZA.y*fQZC.x);
-  fVXaZXXCent->Fill(fCentrality, fQVA.x*fQZC.x*fQZA.x, fCentralityWeight);
-  fVXcZXXCent->Fill(fCentrality, fQVC.x*fQZC.x*fQZA.x, fCentralityWeight);
-  fVXaVXcCent->Fill(fCentrality, fQVA.x*fQVC.x, fCentralityWeight);
-  fVYaZYYCent->Fill(fCentrality, fQVA.y*fQZC.y*fQZA.y, fCentralityWeight);
-  fVYcZYYCent->Fill(fCentrality, fQVC.y*fQZC.y*fQZA.y, fCentralityWeight);
-  fVYaVYcCent->Fill(fCentrality, fQVA.y*fQVC.y, fCentralityWeight);
+  fVXaZXXCent->Fill(fCentrality, fQVA.x*fQZC.x*fQZA.x, weight);
+  fVXcZXXCent->Fill(fCentrality, fQVC.x*fQZC.x*fQZA.x, weight);
+  fVXaVXcCent->Fill(fCentrality, fQVA.x*fQVC.x, weight);
+  fVYaZYYCent->Fill(fCentrality, fQVA.y*fQZC.y*fQZA.y, weight);
+  fVYcZYYCent->Fill(fCentrality, fQVC.y*fQZC.y*fQZA.y, weight);
+  fVYaVYcCent->Fill(fCentrality, fQVA.y*fQVC.y, weight);
   for (int isample = 0; isample < fNsamples; ++isample) {
     for (int i = 0; i < fSamples[isample]; ++i) {
-        fXaXcCentBS[isample]->Fill(fCentrality, fQZA.x*fQZC.x, fCentralityWeight);
-        fYaYcCentBS[isample]->Fill(fCentrality, fQZA.y*fQZC.y, fCentralityWeight);
-        fXaYcCentBS[isample]->Fill(fCentrality, fQZA.x*fQZC.y, fCentralityWeight);
-        fYaXcCentBS[isample]->Fill(fCentrality, fQZA.y*fQZC.x, fCentralityWeight);
+        fXaXcCentBS[isample]->Fill(fCentrality, fQZA.x*fQZC.x, weight);
+        fYaYcCentBS[isample]->Fill(fCentrality, fQZA.y*fQZC.y, weight);
+        fXaYcCentBS[isample]->Fill(fCentrality, fQZA.x*fQZC.y, weight);
+        fYaXcCentBS[isample]->Fill(fCentrality, fQZA.y*fQZC.x, weight);
     }
   }
 
@@ -84,21 +90,25 @@ void AliZDCellipticFlow::CalculateCorrelations(Qv<4,4> qtpc,
 
     double v2_xyx_pt = qx*fQZA.y*fQZC.x;
     double v2_xxy_pt = qx*fQZA.x*fQZC.y;
+    auto bin_weight = weight;
+    if (fUseMultWeights) {
+      bin_weight *= m;
+    }
     fPtCent->Fill(fCentrality, pt, m);
-    fV2XXXpTcent->Fill(fCentrality, pt, v2_xxx_pt, fCentralityWeight);
-    fV2XYYpTcent->Fill(fCentrality, pt, v2_xyy_pt, fCentralityWeight);
-    fV2YXYpTcent->Fill(fCentrality, pt, v2_yxy_pt, fCentralityWeight);
-    fV2YYXpTcent->Fill(fCentrality, pt, v2_yyx_pt, fCentralityWeight);
-    fV2YYYpTcent->Fill(fCentrality, pt, v2_yyy_pt, fCentralityWeight);
-    fV2YXXpTcent->Fill(fCentrality, pt, v2_yxx_pt, fCentralityWeight);
-    fV2XXYpTcent->Fill(fCentrality, pt, v2_xxy_pt, fCentralityWeight);
-    fV2XYXpTcent->Fill(fCentrality, pt, v2_xyx_pt, fCentralityWeight);
+    fV2XXXpTcent->Fill(fCentrality, pt, v2_xxx_pt, bin_weight);
+    fV2XYYpTcent->Fill(fCentrality, pt, v2_xyy_pt, bin_weight);
+    fV2YXYpTcent->Fill(fCentrality, pt, v2_yxy_pt, bin_weight);
+    fV2YYXpTcent->Fill(fCentrality, pt, v2_yyx_pt, bin_weight);
+    fV2YYYpTcent->Fill(fCentrality, pt, v2_yyy_pt, bin_weight);
+    fV2YXXpTcent->Fill(fCentrality, pt, v2_yxx_pt, bin_weight);
+    fV2XXYpTcent->Fill(fCentrality, pt, v2_xxy_pt, bin_weight);
+    fV2XYXpTcent->Fill(fCentrality, pt, v2_xyx_pt, bin_weight);
     for (int isample = 0; isample < fNsamples; ++isample) {
       for (int i = 0; i < fSamples[isample]; ++i) {
-        fV2XXXpTcentBS[isample]->Fill(fCentrality, pt, v2_xxx_pt, fCentralityWeight);
-        fV2XYYpTcentBS[isample]->Fill(fCentrality, pt, v2_xyy_pt, fCentralityWeight);
-        fV2YXYpTcentBS[isample]->Fill(fCentrality, pt, v2_yxy_pt, fCentralityWeight);
-        fV2YYXpTcentBS[isample]->Fill(fCentrality, pt, v2_yyx_pt, fCentralityWeight);
+        fV2XXXpTcentBS[isample]->Fill(fCentrality, pt, v2_xxx_pt, bin_weight);
+        fV2XYYpTcentBS[isample]->Fill(fCentrality, pt, v2_xyy_pt, bin_weight);
+        fV2YXYpTcentBS[isample]->Fill(fCentrality, pt, v2_yxy_pt, bin_weight);
+        fV2YYXpTcentBS[isample]->Fill(fCentrality, pt, v2_yyx_pt, bin_weight);
       }
     }
     fV2XXXpT[fCentralityBin]->Fill(pt, v2_xxx_pt);
@@ -120,6 +130,7 @@ void AliZDCellipticFlow::CalculateCorrelations(Qv<4,4> qtpc,
     qx /= m;
     qy /= m;
   }
+
   double v2_xxx = qx*fQZA.x*fQZC.x;
   double v2_xyy = qx*fQZA.y*fQZC.y;
   double v2_yxy = qy*fQZA.x*fQZC.y;
@@ -142,27 +153,36 @@ void AliZDCellipticFlow::CalculateCorrelations(Qv<4,4> qtpc,
     qyetan /= metan;
   }
 
+  auto bin_weight = weight;
+  if (fUseMultWeights) {
+    bin_weight *= m;
+  }
+
+  fVaVcCent->Fill(fCentrality,fQVA.x*fQVC.x + fQVA.y*fQVC.y);
+  fTVaCent->Fill(fCentrality,qx*fQVA.x + qy*fQVA.y);
+  fTVcCent->Fill(fCentrality,qx*fQVC.x + qy*fQVC.y);
+
   if (metan > 0. && metap > 0.) {
-    fTXaZXXCent->Fill(fCentrality,qxetap*fQZA.x*fQZC.x, fCentralityWeight);
-    fTXcZXXCent->Fill(fCentrality,qxetan*fQZA.x*fQZC.x, fCentralityWeight);
-    fTXaTXcCent->Fill(fCentrality,qxetan*qxetap       , fCentralityWeight);
-    fTYaZYYCent->Fill(fCentrality,qyetap*fQZA.y*fQZC.y, fCentralityWeight);
-    fTYcZYYCent->Fill(fCentrality,qyetan*fQZA.y*fQZC.y, fCentralityWeight);
-    fTYaTYcCent->Fill(fCentrality,qyetan*qyetap       , fCentralityWeight);
+    fTXaZXXCent->Fill(fCentrality,qxetap*fQZA.x*fQZC.x, bin_weight);
+    fTXcZXXCent->Fill(fCentrality,qxetan*fQZA.x*fQZC.x, bin_weight);
+    fTXaTXcCent->Fill(fCentrality,qxetan*qxetap       , bin_weight);
+    fTYaZYYCent->Fill(fCentrality,qyetap*fQZA.y*fQZC.y, bin_weight);
+    fTYcZYYCent->Fill(fCentrality,qyetan*fQZA.y*fQZC.y, bin_weight);
+    fTYaTYcCent->Fill(fCentrality,qyetan*qyetap       , bin_weight);
   }
 
   if (m > 0) {
-    fXtYaYcDistCent->Fill(fCentrality, v2_xyy);
-    fYtXaYcDistCent->Fill(fCentrality, v2_yxy);
-    fYtYaXcDistCent->Fill(fCentrality, v2_yyx);
-    fXtXaXcCent->Fill(fCentrality, v2_xxx);
-    fYtYaYcCent->Fill(fCentrality, v2_yyy);
-    fXtXaYcCent->Fill(fCentrality, v2_xxy);
-    fXtYaXcCent->Fill(fCentrality, v2_xyx);
-    fYtXaXcCent->Fill(fCentrality, v2_yxx);
-    fYtYaXcCent->Fill(fCentrality, v2_yyx);
-    fYtXaYcCent->Fill(fCentrality, v2_yxy);
-    fXtYaYcCent->Fill(fCentrality, v2_xyy);
+    fXtYaYcDistCent->Fill(fCentrality, v2_xyy, bin_weight);
+    fYtXaYcDistCent->Fill(fCentrality, v2_yxy, bin_weight);
+    fYtYaXcDistCent->Fill(fCentrality, v2_yyx, bin_weight);
+    fXtXaXcCent->Fill(fCentrality, v2_xxx, bin_weight);
+    fYtYaYcCent->Fill(fCentrality, v2_yyy, bin_weight);
+    fXtXaYcCent->Fill(fCentrality, v2_xxy, bin_weight);
+    fXtYaXcCent->Fill(fCentrality, v2_xyx, bin_weight);
+    fYtXaXcCent->Fill(fCentrality, v2_yxx, bin_weight);
+    fYtYaXcCent->Fill(fCentrality, v2_yyx, bin_weight);
+    fYtXaYcCent->Fill(fCentrality, v2_yxy, bin_weight);
+    fXtYaYcCent->Fill(fCentrality, v2_xyy, bin_weight);
   }
 }
 
@@ -244,6 +264,10 @@ TList *AliZDCellipticFlow::CreateCorrelations() {
   correlation_list->Add(fVYaZYYCent);
   correlation_list->Add(fVYcZYYCent);
   correlation_list->Add(fVYaVYcCent);
+
+  fVaVcCent= new TProfile("VaVcCent",";centrality V0M;#LTQ_{2}^{V0A}Q_{2}^{V0C}#GT",100,0.,100.);
+  fTVaCent = new TProfile("TVaCent",";centrality V0M;#LTQ_{2}^{TPC}Q_{2}^{V0A}#GT",100,0.,100.);
+  fTVcCent = new TProfile("TVcCent",";centrality V0M;#LTQ_{2}^{TPC}Q_{2}^{V0C}#GT",100,0.,100.);
 
   fXaXcCent = new TProfile("XXCent",";centrality V0M;#LTX_{1}^{ZNA}X_{1}^{ZNC}#GT",100,0.,100.);
   fYaYcCent = new TProfile("YYCent",";centrality V0M;#LTY_{1}^{ZNA}Y_{1}^{ZNC}#GT",100,0.,100.);

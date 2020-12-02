@@ -17,12 +17,17 @@
 #include "AliAODEvent.h"
 #include "AliAODTrack.h"
 
+#include "TH2.h"
+#include "TH1.h"
+
 #include "AliZDCflowCuts.h"
 
 void AliZDCflowCuts::CheckEventCuts(AliAODEvent* event) {
-  bool selected = true;
-  if(!(std::abs(event->GetPrimaryVertex()->GetZ()) < vtxZcut)) selected = false;
-  fEventSelected = selected;
+  if (fEventSelected) {
+    bool selected = true;
+    if(!(std::abs(event->GetPrimaryVertex()->GetZ()) < vtxZcut)) selected = false;
+    fEventSelected = selected;
+  }
   fEvent = event;
 }
 
@@ -45,6 +50,18 @@ void AliZDCflowCuts::AddQAHistograms(TList *list) {
   fHistTPCSharedClsF = new TH1D("TPCClsSharedFraction",";n cls tpc;N", 100, 0, 1.);
   fHistDCAxy = new TH2D("dcaxy", ";dcaxy;cuts applied;N", 1000, 0., 5., 2, 0., 2.);
   fHistDCAz = new TH2D("dcaz", ";dcaz;cuts applied;N", 1000, 0., 5., 2, 0., 2.);
+  fHistOutlierCut = new TH2D("outliercut", ";ntracks;centrality", 90, 0., 90, 3000, 0., 3000);
+  
+  for (int i = 0; i < 6; ++i) {
+    auto name_before = TString::Format("fTPCMUltVsITSCls_Layer%d_before", i);
+    auto name_after = TString::Format("fTPCMUltVsITSCls_Layer%d_after", i);
+    auto before = new TH2D(name_before,"ncls its; ntracks;",1000, 0., 8000., 1000, 0., 4000.);
+    auto after = new TH2D(name_after,"ncls its; ntracks;",1000, 0., 8000., 1000, 0., 4000.);
+    fTPCMultVsITSCls_before.push_back(before);
+    fTPCMultVsITSCls_after.push_back(after);
+    qalist->Add(before);
+    qalist->Add(after);
+  }
   qalist->Add(fHistPhi);
   qalist->Add(fHistEta);
   qalist->Add(fHistDCAxy);
@@ -55,6 +72,7 @@ void AliZDCflowCuts::AddQAHistograms(TList *list) {
   qalist->Add(fHistITSchi2);
   qalist->Add(fHistTPCchi2CvsGlo);
   qalist->Add(fHistTPCSharedClsF);
+  qalist->Add(fHistOutlierCut);
   list->Add(qalist);
   fQAhistograms = true;
 }
@@ -133,4 +151,20 @@ void AliZDCflowCuts::Print() {
        << "ptMin      " << ptMin      << endl
        << "ptMax      " << ptMax      << endl
        << "etaMax     " << etaMax     << endl;
+}
+
+void AliZDCflowCuts::CheckMultPileup(int ntracks, std::vector<int> ncls_its, std::vector<double> means,
+    std::vector<double> sigmas, double cent) {
+  fEventSelected = true;
+  for (int i = 0; i < 6; ++i) fTPCMultVsITSCls_before[i]->Fill(ncls_its[i], ntracks);
+  if (means.size() == 6) {
+    for (int i = 0; i < 6; ++i) {
+      if (ntracks > means[i] + outlierCut * sigmas[i] ||
+        ntracks < means[i] - outlierCut * sigmas[i]) fEventSelected = false;
+      else {
+        fTPCMultVsITSCls_after[i]->Fill(ncls_its[i], ntracks);  
+      }
+    }
+  }
+  if (fEventSelected) fHistOutlierCut->Fill(cent, ntracks);
 }

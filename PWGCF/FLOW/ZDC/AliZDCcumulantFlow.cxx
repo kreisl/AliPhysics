@@ -10,7 +10,8 @@
  * copies and that both the copyright notice and this permission notice   *
  * appear in the supporting documentation. The authors make no claims     *
  * about the suitability of this software for any purpose. It is          *
- * provided "as is" without express or implied warranty.                  * **************************************************************************/
+ * provided "as is" without express or implied warranty.                  *
+ **************************************************************************/
 
 #include <iostream>
 #include <cmath>
@@ -33,12 +34,12 @@ AliZDCcumulantFlow::AliZDCcumulantFlow(std::string name) :
     AliZDCanalysis(name) {
   }
 
-void AliZDCcumulantFlow::FindCentralityBin(AliAODEvent *event, Double_t centrality, const std::vector<Int_t> &samples) {
+void AliZDCcumulantFlow::FindCentralityBin(AliAODEvent *event, std::vector<Double_t> centralities, const std::vector<Int_t> &samples) {
   fCuts.CheckEventCuts(event); 
-  fCentrality = centrality;
+  fCentrality = fCuts.GetCentrality(centralities);
   const AliAODVertex* vtx = event->GetPrimaryVertex();
   fVertexZ = vtx->GetZ();
-  fCuts.HasPassedCentrality(centrality > 0. && centrality < 90.);
+  fCuts.HasPassedCentrality(fCentrality > 0. && fCentrality < 90.);
   fSamples = samples;
   fPtEffCentBin = GetPtEfficiencyCentralityBin(fCentrality);
 }
@@ -67,17 +68,24 @@ void AliZDCcumulantFlow::FillPerTrackCorrelations(AliAODTrack *track) {
     if (w > 0.) weight_nua = 1. / w;
     else return;
   }
-  if (fApplyNUE &&
-      !fPtEfficienciesFit.empty() &&
-      !fPtEfficienciesSpline.empty()) {
+  if (fApplyNUE) {
     auto w = 1.; 
-    if (pt < 3.) {
-      w = fPtEfficienciesSpline.at(fPtEffCentBin)->Eval(pt);
+    /// Integrated NUE corrections
+    if (fUseNUEintegrated) {
+      if (fPtEfficiencySpline) {
+        w = fPtEfficiencySpline->Eval(pt);
+        if (w > 0.) weight_nue = 1. / w;
+        else        return;
+      }
+    /// Binned NUE corrections
     } else {
-      w = fPtEfficienciesFit.at(fPtEffCentBin)->Eval(pt);
+      auto spline = fPtEfficiencySplinesCentralityClasses[fPtEffCentBin];
+      if (spline) {
+        w = spline->Eval(pt);
+        if (w > 0.) weight_nue = 1. / w;
+        else        return; 
+      }
     }
-    if (w > 0.) weight_nue = 1. / w;
-    else return;
   }
   auto weight = weight_nua * weight_nue;
   if (fUseEtaGap) {
@@ -341,21 +349,27 @@ void AliZDCcumulantFlow::ScaleNUA(TH3D* unscaled, TH3D* scaled) {
 
 void AliZDCcumulantFlow::OpenPtEfficiencies(TFile *file) {
   if (file && !file->IsZombie()) { 
-    std::vector<TString> names = {  "<5", "5-10","10-20",
-                                  "20-30","30-40","40-50",
-                                  "50-60","60-70",">70"};
     bool applied = true;
-    for (unsigned int i = 0; i < names.size(); ++i) {
-      auto histo = (TH1D*) file->Get(Form("eff_unbiased_%i",i));
+    if (fUseNUEintegrated) {
+      auto name = TString::Format("PtEfficiencyAllCentralities%i", fCuts.filterBit);
+      auto histo = (TH1D*) file->Get(name);
       if (histo) {
-        auto spline = new TSpline3(histo);
-        auto fit = new TF1(TString("f1")+names[i], "pol3",5, 30);
-        histo->Fit(fit, "Q0N","",3.,20.);
-        spline->SetName(names[i]);
-        fPtEfficienciesFit.push_back(fit); 
-        fPtEfficienciesSpline.push_back(spline); 
+        auto spline = new TSpline3(histo); 
+        fPtEfficiencySpline = spline; 
       } else {
         applied = false;
+      }
+    } else {
+      fPtEfficiencySplinesCentralityClasses.resize(9);
+      for (unsigned int i = 0; i < 9; ++i) {
+        auto namebins = TString::Format("PtEfficiency%iCentBin%i", fCuts.filterBit, i);
+        auto histo = (TH1D*) file->Get(namebins);
+        if (histo) {
+          auto spline = new TSpline3(histo);
+          fPtEfficiencySplinesCentralityClasses.at(i) = spline;
+        } else {
+          applied = false;
+        }
       }
     }
     if (applied) fAreWeightsApplied->Fill(1.);

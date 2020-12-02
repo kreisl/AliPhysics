@@ -21,7 +21,7 @@ class AliZDCanalysis : public TObject {
   void SetCentralityWeight(double weight) {
      fCentralityWeight = weight;
   }
-  virtual void FindCentralityBin(AliAODEvent *event, Double_t centrality, const std::vector<Int_t> &samples) = 0;
+  virtual void FindCentralityBin(AliAODEvent *event, std::vector<Double_t> centrality, const std::vector<Int_t> &samples) = 0;
   AliZDCflowCuts& Cuts() { return fCuts; }
   void AddQAHistograms(TList* qa) {
     auto qalist = new TList();
@@ -48,6 +48,8 @@ class AliZDCanalysis : public TObject {
     auto analysis_settings = node["analysis_settings"];
     if (analysis_settings.IsDefined()) {
       ParseValue(fQvectorName, analysis_settings, "qvector_name");
+      ParseFlag(fUseMultWeights, analysis_settings, "multiplicity_weight");
+      ParseFlag(fUseZDCMultWeights, analysis_settings, "zdc_multiplicity_weight");
     }
     fCuts.ReadYAMLnode(node);
   }
@@ -57,6 +59,8 @@ class AliZDCanalysis : public TObject {
   }
   std::string Name() const {return fName;}
  protected:
+  bool fUseMultWeights = false;
+  bool fUseZDCMultWeights = false;
   Int_t fNsamples = 10;                                  /// Number of samples
   std::vector<Int_t> fSamples = std::vector<Int_t>(fNsamples);
   std::string fName = "default";

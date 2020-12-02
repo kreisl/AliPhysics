@@ -34,6 +34,11 @@ void AliQvectorCorrectionND::Make(TFile *file, int run_number, TList *correction
   AddHistogramsToList(corrections);
   AddQAToList(qa);
   OpenCorrection(file, run_number);
+  if (fIsApplied) {
+    AliDebug(AliLog::kInfo, (fName+": Applying recentering").c_str());
+  } else {
+    AliDebug(AliLog::kInfo, (fName+": Collecting recentering information").c_str());
+  }
 }
 
 AliQvector AliQvectorCorrectionND::Apply(const AliQvector q_vector, double *variables) {

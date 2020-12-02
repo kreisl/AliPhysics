@@ -13,12 +13,14 @@
  * provided "as is" without express or implied warranty.                  *
  **************************************************************************/
 
+#include <iostream>
+
+#include "AliLog.h"
 #include "TH1.h"
 #include "AliOADBContainer.h"
 #include "TFile.h"
 #include "TList.h"
 #include "AliZDCgainEq.h"
-#include <iostream>
 
 AliZDCgainEq::AliZDCgainEq(std::string name, UInt_t n_channels, std::vector<UInt_t> groups) :
   TObject(),
@@ -73,6 +75,11 @@ TProfile* AliZDCgainEq::ReadFromOADB(TFile *file, const std::string &oadb_name, 
 void AliZDCgainEq::OpenCorrection(TFile *file, Int_t run_number) {
   if (!file || file->IsZombie()) return;
   fAverageGainIn.reset(ReadFromOADB(file, fAverageGainOut->GetName(), run_number));
+  if (fIsApplied) {
+    AliDebug(AliLog::kInfo, (fName+": Applying gain equalization").c_str());
+  } else {
+    AliDebug(AliLog::kInfo, (fName+": Collecting gain equalization information").c_str());
+  }
 }
 
 void AliZDCgainEq::AddCorrectionsToList(TList *correction_list, TList *qa_list) {
