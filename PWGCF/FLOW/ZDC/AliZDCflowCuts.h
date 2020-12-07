@@ -52,7 +52,7 @@ class AliZDCflowCuts : public TObject {
     Double_t chi2MinCut =  0.1;
     Double_t chi2MaxCut =  4.;
     Double_t      ptMin =  0.2;
-    Double_t      ptMax = 3.;
+    Double_t      ptMax = 30.;
     Double_t     etaMax =  0.8;
     Double_t outlierCut = 3.;
     TH2D *fHistPhi;

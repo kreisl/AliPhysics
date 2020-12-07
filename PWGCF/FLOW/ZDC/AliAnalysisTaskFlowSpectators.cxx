@@ -276,12 +276,14 @@ void AliAnalysisTaskFlowSpectators::NotifyRun() {
     // Recenter ZN
     fRecenter4DZNA.Make(file, fCurrentRunNumber, fCorrectionList, fQAList);
     fRecenter4DZNC.Make(file, fCurrentRunNumber, fCorrectionList, fQAList);
+    AliDebug(AliLog::kDebug, "test");
 
     // Recenter ZN
     fRecenter4DAfterGainEqZNA.Make(file, fCurrentRunNumber, fCorrectionList, fQAList);
     fRecenter4DAfterGainEqZNC.Make(file, fCurrentRunNumber, fCorrectionList, fQAList);
 
     // cumulants
+    AliDebug(AliLog::kInfo, "Open cumulant corrections");
     for (auto &analysis : fCumulantFlowAnalyses) {
       analysis.OpenCorrection(file, fCurrentRunNumber);
     }
@@ -527,6 +529,8 @@ void AliAnalysisTaskFlowSpectators::AnalyzeEvent(AliAODEvent *event) {
   cut.CheckEventCuts(event);
   const unsigned int ntracks = event->GetNumberOfTracks();
   auto ptweight_spline = fCumulantFlowAnalyses.at(0).GetPtSplineIntegrated();
+  auto nua = fCumulantFlowAnalyses.at(0).GetNUA();
+  
   for (unsigned int i = 0; i < ntracks; ++i) {
     auto track = static_cast<AliAODTrack *>(event->GetTrack(i));
     if (!track) continue;
@@ -548,16 +552,19 @@ void AliAnalysisTaskFlowSpectators::AnalyzeEvent(AliAODEvent *event) {
       } else {
         fValues[kPtWeight] = 1.;
       }
+      fValues[kWeight] = 1.;
+      if (nua) {
+        auto bin = nua->FindBin(fValues[kPhi], fValues[kEta], fValues[kVtxZ]);
+        auto w = nua->GetBinContent(bin);
+        if (w > 0.) {
+          fValues[kWeight] = fValues[kPtWeight] * 1./ w;
+        }
+      }
       fValues[kCharge] = track->GetSign();
       fCorrectionManager->FillTrackingDetectors();
     }
   }
   AliDebug(AliLog::kDebug, "Finished track loop");
-  if (fActivateQnTools) {
-    fValues[kNTPCTracksHybrid] = ntracks_hybrid;
-    fValues[kNTPCTracksTPConly] = ntracks_tpconly;
-    fCorrectionManager->ProcessCorrections();
-  }
 
   std::map<std::string, Qv<4, 4>> qtpc;
   std::map<std::string, std::vector<Qv<4, 4>>> qtpcpt;
@@ -569,6 +576,13 @@ void AliAnalysisTaskFlowSpectators::AnalyzeEvent(AliAODEvent *event) {
     qtpcp.emplace(analysis.Name(), analysis.GetQTPCEtaPos());
     qtpcn.emplace(analysis.Name(), analysis.GetQTPCEtaNeg());
   }
+
+  if (fActivateQnTools) {
+    fValues[kNTPCTracksHybrid] = ntracks_hybrid;
+    fValues[kNTPCTracksTPConly] = ntracks_tpconly;
+    fCorrectionManager->ProcessCorrections();
+  }
+
   // ZDC alignment
   AliQvector q_tpc = {qtpc["default"](1, 1).real(), qtpc["default"](1, 1).imag(), qtpc["default"](0, 1).real()};
   AliZDCQvectors q_align_c;
@@ -605,6 +619,8 @@ void AliAnalysisTaskFlowSpectators::AnalyzeEvent(AliAODEvent *event) {
   for (auto &analysis : fCumulantFlowAnalyses) {
     analysis.CalculateCumulants();
   }
+
+
   // Fill Eventplane angle QA histograms.
   fPsiZA->Fill(q_zn_plain.a.Psi());
   fPsiZC->Fill(q_zn_plain.c.Psi());

@@ -83,6 +83,7 @@ class AliAnalysisTaskFlowSpectators : public AliAnalysisTaskSE {
     kPz,
     kEta,
     kPtWeight,
+    kWeight,
     kDCAxy,
     kDCAz,
     kDCAxySigma,

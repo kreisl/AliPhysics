@@ -350,25 +350,46 @@ void AliZDCcumulantFlow::ScaleNUA(TH3D* unscaled, TH3D* scaled) {
 void AliZDCcumulantFlow::OpenPtEfficiencies(TFile *file) {
   if (file && !file->IsZombie()) { 
     bool applied = true;
-    if (fUseNUEintegrated) {
-      auto name = TString::Format("PtEfficiencyAllCentralities%i", fCuts.filterBit);
-      auto histo = (TH1D*) file->Get(name);
-      if (histo) {
-        auto spline = new TSpline3(histo); 
-        fPtEfficiencySpline = spline; 
-      } else {
-        applied = false;
-      }
-    } else {
-      fPtEfficiencySplinesCentralityClasses.resize(9);
-      for (unsigned int i = 0; i < 9; ++i) {
-        auto namebins = TString::Format("PtEfficiency%iCentBin%i", fCuts.filterBit, i);
-        auto histo = (TH1D*) file->Get(namebins);
+    if (fUseNUEsecondary) {
+      if (fUseNUEintegrated) {
+        auto histo = (TH1D*) file->Get(TString::Format("PtEfficiencyAllCentralities%i", fCuts.filterBit));
         if (histo) {
-          auto spline = new TSpline3(histo);
-          fPtEfficiencySplinesCentralityClasses.at(i) = spline;
+          auto spline = new TSpline3(histo); 
+          fPtEfficiencySpline = spline; 
         } else {
           applied = false;
+        }
+      } else {
+        fPtEfficiencySplinesCentralityClasses.resize(9);
+        for (unsigned int i = 0; i < 9; ++i) {
+          auto histo = (TH1D*) file->Get(TString::Format("PtEfficiency%iCentBin%i", fCuts.filterBit, i));
+          if (histo) {
+            auto spline = new TSpline3(histo);
+            fPtEfficiencySplinesCentralityClasses.at(i) = spline;
+          } else {
+            applied = false;
+          }
+        }
+      }      
+    } else {
+      if (fUseNUEintegrated) {
+        auto histo = (TH1D*) file->Get(TString::Format("PtEfficiencyPrimaryAllCentralities%i", fCuts.filterBit));
+        if (histo) {
+          auto spline = new TSpline3(histo); 
+          fPtEfficiencySpline = spline; 
+        } else {
+          applied = false;
+        }
+      } else {
+        fPtEfficiencySplinesCentralityClasses.resize(9);
+        for (unsigned int i = 0; i < 9; ++i) {
+          auto histo = (TH1D*) file->Get(TString::Format("PtEfficiencyPrimary%iCentBin%i", fCuts.filterBit, i));
+          if (histo) {
+            auto spline = new TSpline3(histo);
+            fPtEfficiencySplinesCentralityClasses.at(i) = spline;
+          } else {
+            applied = false;
+          }
         }
       }
     }

@@ -52,6 +52,7 @@ class AliZDCcumulantFlow : public AliZDCanalysis {
   void CalculateCumulants();
   void FillESE(double qzna, double qznc);
   TSpline3* GetPtSplineIntegrated() { return fPtEfficiencySpline; }
+  TH3D* GetNUA() { return fNUAweightsScaled; }
 
   void SetBootStrapSamples(int n) {
     fNsamples = n;
@@ -65,6 +66,7 @@ class AliZDCcumulantFlow : public AliZDCanalysis {
       ParseFlag(fApplyNUA, analysis_settings, "nua_weights");
       ParseFlag(fApplyNUE, analysis_settings, "nue_weights");
       ParseFlag(fUseNUEintegrated, analysis_settings, "nue_weights_integrated");
+      ParseFlag(fUseNUEsecondary, analysis_settings, "nue_weights_secondary");
     }
     fCuts.ReadYAMLnode(node);
   }
@@ -96,6 +98,7 @@ class AliZDCcumulantFlow : public AliZDCanalysis {
   void ScaleNUA(TH3D* unscaled, TH3D* scaled);
 
   bool fUseNUEintegrated = true;
+  bool fUseNUEsecondary = false;
   bool fUseEtaGap = false;
   bool fApplyNUA  = true;
   bool fApplyNUE  = true;
