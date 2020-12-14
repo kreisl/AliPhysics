@@ -10,6 +10,7 @@
 #pragma link C++ class AliQvectorCorrectionND+;
 #pragma link C++ class AliQvectorAlignmentND+;
 #pragma link C++ class AliAnalysisTaskFlowZ+;
-#pragma link C++ class AliAnalysisTaskFlowSpectators+;
+#pragma link C++ class AliAnalysisTaskZDCEfficiency+;
 #pragma link C++ class AliQvectorMagnitude+;
+#pragma link C++ class AliAnalysisTaskFlowSpectators+;
 #endif

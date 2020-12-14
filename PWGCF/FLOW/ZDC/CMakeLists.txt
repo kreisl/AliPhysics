@@ -44,6 +44,7 @@ if (QnTools_FOUND)
     AliQvectorMagnitude.cxx
     AliZDCResultStorage.cxx
     AliAnalysisTaskFlowSpectators.cxx
+    AliAnalysisTaskZDCEfficiency.cxx
     )
   # Headers from sources
   string(REPLACE ".cxx" ".h" HDRS "${SRCS}")
